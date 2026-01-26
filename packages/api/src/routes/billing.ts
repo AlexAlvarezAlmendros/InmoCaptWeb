@@ -1,7 +1,19 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import Stripe from "stripe";
 import { authenticate } from "../plugins/auth.js";
 import { stripe } from "../config/stripe.js";
 import { env } from "../config/env.js";
+import {
+  getStripeCustomerId,
+  updateStripeCustomerId,
+  ensureUserExists,
+} from "../services/userService.js";
+import {
+  createSubscription,
+  updateSubscriptionByStripeId,
+  cancelSubscriptionByStripeId,
+} from "../services/subscriptionService.js";
+import { zodValidate, checkoutSessionSchema } from "../schemas/validation.js";
 
 export async function billingRoutes(fastify: FastifyInstance) {
   // Create checkout session for subscribing to a list
@@ -9,16 +21,35 @@ export async function billingRoutes(fastify: FastifyInstance) {
     "/checkout-session",
     { preHandler: [authenticate] },
     async (request, reply) => {
+      // Validate body
+      const result = zodValidate(checkoutSessionSchema, request.body);
+      if (!result.success) {
+        return reply.code(400).send({ error: result.error });
+      }
+
       const userId = request.user.sub;
       const userEmail = request.user.email;
-      const { listId, priceId } = request.body as {
-        listId: string;
-        priceId: string;
-      };
+      const { listId, priceId } = result.data;
+
+      // Ensure user exists in DB
+      await ensureUserExists(request.user);
 
       try {
+        // Check if user already has a Stripe customer ID
+        let customerId = await getStripeCustomerId(userId);
+
+        // If not, create a new customer
+        if (!customerId) {
+          const customer = await stripe.customers.create({
+            email: userEmail,
+            metadata: { userId },
+          });
+          customerId = customer.id;
+          await updateStripeCustomerId(userId, customerId);
+        }
+
         const session = await stripe.checkout.sessions.create({
-          customer_email: userEmail,
+          customer: customerId,
           mode: "subscription",
           line_items: [
             {
@@ -29,6 +60,12 @@ export async function billingRoutes(fastify: FastifyInstance) {
           metadata: {
             userId,
             listId,
+          },
+          subscription_data: {
+            metadata: {
+              userId,
+              listId,
+            },
           },
           success_url: `${env.CORS_ORIGIN}/app/dashboard?checkout=success`,
           cancel_url: `${env.CORS_ORIGIN}/app/subscriptions?checkout=cancelled`,
@@ -49,11 +86,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
     "/portal-session",
     { preHandler: [authenticate] },
     async (request, reply) => {
-      const _userId = request.user.sub;
-      void _userId; // Will be used to fetch stripeCustomerId from DB
+      const userId = request.user.sub;
 
-      // TODO: Get Stripe customer ID from database
-      const stripeCustomerId = ""; // Placeholder
+      // Get Stripe customer ID from database
+      const stripeCustomerId = await getStripeCustomerId(userId);
 
       if (!stripeCustomerId) {
         return reply.code(400).send({ error: "No billing account found" });
@@ -81,9 +117,9 @@ export async function billingRoutes(fastify: FastifyInstance) {
     {},
     async (request: FastifyRequest, reply: FastifyReply) => {
       const sig = request.headers["stripe-signature"] as string;
-      const rawBody = (request as any).rawBody;
+      const rawBody = (request as unknown as { rawBody: Buffer }).rawBody;
 
-      let event;
+      let event: Stripe.Event;
 
       try {
         event = stripe.webhooks.constructEvent(
@@ -101,26 +137,90 @@ export async function billingRoutes(fastify: FastifyInstance) {
       // Handle the event
       switch (event.type) {
         case "checkout.session.completed": {
-          const session = event.data.object;
+          const session = event.data.object as Stripe.Checkout.Session;
+          const userId = session.metadata?.userId;
+          const listId = session.metadata?.listId;
+          const subscriptionId = session.subscription as string;
+          const customerId = session.customer as string;
+
+          if (userId && listId && subscriptionId) {
+            // Get subscription details from Stripe
+            const subscription =
+              await stripe.subscriptions.retrieve(subscriptionId);
+            const periodEnd = new Date(
+              subscription.current_period_end * 1000,
+            ).toISOString();
+
+            await createSubscription({
+              userId,
+              listId,
+              stripeSubscriptionId: subscriptionId,
+              stripeCustomerId: customerId,
+              status: "active",
+              currentPeriodEnd: periodEnd,
+            });
+
+            fastify.log.info(
+              `Subscription created for user ${userId} to list ${listId}`,
+            );
+          }
+          break;
+        }
+
+        case "customer.subscription.updated": {
+          const subscription = event.data.object as Stripe.Subscription;
+          const periodEnd = new Date(
+            subscription.current_period_end * 1000,
+          ).toISOString();
+
+          // Map Stripe status to our status
+          let status = "active";
+          if (subscription.status === "past_due") {
+            status = "past_due";
+          } else if (
+            subscription.status === "canceled" ||
+            subscription.status === "unpaid"
+          ) {
+            status = "canceled";
+          }
+
+          await updateSubscriptionByStripeId({
+            stripeSubscriptionId: subscription.id,
+            status,
+            currentPeriodEnd: periodEnd,
+          });
+
           fastify.log.info(
-            `Checkout completed for user: ${session.metadata?.userId}`,
+            `Subscription ${subscription.id} updated to status: ${status}`,
           );
-          // TODO: Create subscription in database
           break;
         }
-        case "customer.subscription.updated":
+
         case "customer.subscription.deleted": {
-          const subscription = event.data.object;
-          fastify.log.info(`Subscription ${event.type}: ${subscription.id}`);
-          // TODO: Update subscription status in database
+          const subscription = event.data.object as Stripe.Subscription;
+
+          await cancelSubscriptionByStripeId(subscription.id);
+
+          fastify.log.info(`Subscription ${subscription.id} canceled`);
           break;
         }
+
         case "invoice.payment_failed": {
-          const invoice = event.data.object;
+          const invoice = event.data.object as Stripe.Invoice;
+          const subscriptionId = invoice.subscription as string;
+
+          if (subscriptionId) {
+            await updateSubscriptionByStripeId({
+              stripeSubscriptionId: subscriptionId,
+              status: "past_due",
+              currentPeriodEnd: null,
+            });
+          }
+
           fastify.log.warn(`Payment failed for invoice: ${invoice.id}`);
-          // TODO: Update subscription status, notify user
           break;
         }
+
         default:
           fastify.log.info(`Unhandled event type: ${event.type}`);
       }

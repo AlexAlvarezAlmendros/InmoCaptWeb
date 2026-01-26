@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,  -- Auth0 sub
   email TEXT NOT NULL UNIQUE,
   email_notifications_on INTEGER DEFAULT 1,
+  stripe_customer_id TEXT,  -- Stripe customer ID for billing
   created_at TEXT DEFAULT (datetime('now'))
 );
 

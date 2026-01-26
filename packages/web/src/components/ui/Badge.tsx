@@ -2,7 +2,7 @@ import { HTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import { PropertyState } from "@/types";
 
-type BadgeVariant =
+export type BadgeVariant =
   | "default"
   | "new"
   | "contacted"
@@ -10,7 +10,8 @@ type BadgeVariant =
   | "rejected"
   | "success"
   | "warning"
-  | "error";
+  | "error"
+  | "info";
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
@@ -25,6 +26,7 @@ const variantStyles: Record<BadgeVariant, string> = {
   success: "bg-accent/10 text-accent",
   warning: "bg-state-contacted/10 text-state-contacted",
   error: "bg-state-rejected/10 text-state-rejected",
+  info: "bg-primary/10 text-primary",
 };
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(

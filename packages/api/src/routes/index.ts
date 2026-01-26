@@ -3,6 +3,7 @@ import { meRoutes } from "./me.js";
 import { listsRoutes } from "./lists.js";
 import { billingRoutes } from "./billing.js";
 import { adminRoutes } from "./admin.js";
+import { listRequestsRoutes } from "./listRequests.js";
 
 export async function registerRoutes(fastify: FastifyInstance) {
   // User routes
@@ -13,6 +14,9 @@ export async function registerRoutes(fastify: FastifyInstance) {
 
   // Billing routes
   await fastify.register(billingRoutes, { prefix: "/api/billing" });
+
+  // List requests routes
+  await fastify.register(listRequestsRoutes, { prefix: "/api/list-requests" });
 
   // Admin routes
   await fastify.register(adminRoutes, { prefix: "/api/admin" });

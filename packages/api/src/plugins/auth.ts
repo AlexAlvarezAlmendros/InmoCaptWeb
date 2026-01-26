@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import jwksClient from "jwks-rsa";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
+import { db } from "../config/database.js";
 
 // Auth0 namespace for custom claims
 const AUTH0_NAMESPACE = "https://inmocapt.com";
@@ -99,13 +100,26 @@ export function requireRole(role: string) {
 
 // Subscription check (queries database)
 export async function requireSubscription(
-  _userId: string,
-  _listId: string,
+  userId: string,
+  listId: string,
 ): Promise<boolean> {
-  // TODO: Query database to check if user has active subscription to list
-  // Parameters will be used: _userId and _listId for DB query
-  void _userId;
-  void _listId;
-  // For now, return true for development
-  return true;
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT id, status, current_period_end 
+        FROM subscriptions 
+        WHERE user_id = ? 
+          AND list_id = ? 
+          AND status = 'active'
+          AND (current_period_end IS NULL OR current_period_end > datetime('now'))
+        LIMIT 1
+      `,
+      args: [userId, listId],
+    });
+
+    return result.rows.length > 0;
+  } catch (error) {
+    console.error("Error checking subscription:", error);
+    return false;
+  }
 }

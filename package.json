@@ -1,0 +1,31 @@
+{
+  "name": "inmocapt-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma FSBO para agentes inmobiliarios",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:web": "npm run dev -w packages/web",
+    "dev:api": "npm run dev -w packages/api",
+    "build": "npm run build --workspaces --if-present",
+    "build:web": "npm run build -w packages/web",
+    "build:api": "npm run build -w packages/api",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "keywords": [
+    "fsbo",
+    "real-estate",
+    "saas",
+    "subscription"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

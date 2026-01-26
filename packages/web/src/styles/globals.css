@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light mode variables */
+    --color-background: 248 250 252; /* #F8FAFC */
+    --color-foreground: 15 23 42; /* #0F172A */
+    --color-card: 255 255 255; /* #FFFFFF */
+    --color-border: 226 232 240; /* #E2E8F0 */
+  }
+
+  .dark {
+    /* Dark mode variables */
+    --color-background: 15 23 42; /* #0F172A */
+    --color-foreground: 229 231 235; /* #E5E7EB */
+    --color-card: 2 6 23; /* #020617 */
+    --color-border: 30 41 59; /* #1E293B */
+  }
+
+  body {
+    @apply bg-surface-light text-slate-900 dark:bg-surface-dark dark:text-slate-100;
+  }
+}
+
+@layer components {
+  /* Botones base */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-dark;
+  }
+
+  .btn-secondary {
+    @apply btn border border-primary text-primary hover:bg-primary hover:text-white;
+  }
+
+  .btn-accent {
+    @apply btn bg-accent text-white hover:bg-accent/90;
+  }
+
+  .btn-danger {
+    @apply btn bg-state-rejected text-white hover:bg-state-rejected/90;
+  }
+
+  /* Cards */
+  .card {
+    @apply rounded-lg border border-border-light bg-card-light p-6 shadow-card dark:border-border-dark dark:bg-card-dark;
+  }
+
+  /* Inputs */
+  .input {
+    @apply flex h-10 w-full rounded-lg border border-border-light bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border-dark dark:bg-card-dark dark:ring-offset-slate-950 dark:placeholder:text-slate-400;
+  }
+
+  /* Badge de estados */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-new {
+    @apply badge bg-state-new/10 text-state-new;
+  }
+
+  .badge-contacted {
+    @apply badge bg-state-contacted/10 text-state-contacted;
+  }
+
+  .badge-captured {
+    @apply badge bg-state-captured/10 text-state-captured;
+  }
+
+  .badge-rejected {
+    @apply badge bg-state-rejected/10 text-state-rejected;
+  }
+}
+
+@layer utilities {
+  /* Animaciones suaves */
+  .transition-base {
+    @apply transition-all duration-[120ms] ease-in-out;
+  }
+}

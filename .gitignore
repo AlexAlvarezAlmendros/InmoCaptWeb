@@ -137,3 +137,7 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+.github/instructions/autenticacion_y_autorizacion.instructions.md
+.github/instructions/documentacion_funcional.instructions.md
+.github/instructions/documentacion_tecnica.instructions.md
+.github/instructions/guia_diseño.instructions.md

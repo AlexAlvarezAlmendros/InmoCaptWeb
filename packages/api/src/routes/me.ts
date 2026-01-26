@@ -3,7 +3,7 @@ import { authenticate } from "../plugins/auth.js";
 
 export async function meRoutes(fastify: FastifyInstance) {
   // Get current user profile
-  fastify.get("/", { preHandler: [authenticate] }, async (request, reply) => {
+  fastify.get("/", { preHandler: [authenticate] }, async (request, _reply) => {
     const user = request.user;
     return {
       id: user.sub,
@@ -16,8 +16,9 @@ export async function meRoutes(fastify: FastifyInstance) {
   fastify.get(
     "/subscriptions",
     { preHandler: [authenticate] },
-    async (request, reply) => {
-      const userId = request.user.sub;
+    async (request, _reply) => {
+      const _userId = request.user.sub;
+      void _userId; // Will be used for DB query
 
       // TODO: Fetch from database
       return {
@@ -31,8 +32,9 @@ export async function meRoutes(fastify: FastifyInstance) {
   fastify.patch(
     "/preferences",
     { preHandler: [authenticate] },
-    async (request, reply) => {
-      const userId = request.user.sub;
+    async (request, _reply) => {
+      const _userId = request.user.sub;
+      void _userId; // Will be used for DB query
       const body = request.body as { emailNotificationsOn?: boolean };
 
       // TODO: Update in database

@@ -1,167 +1,498 @@
-import { useParams } from "react-router-dom";
-import { Badge, getStateLabel, getStateVariant, Button } from "@/components/ui";
+import { useState, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  Badge,
+  getStateLabel,
+  getStateVariant,
+  Button,
+  Card,
+  CardContent,
+} from "@/components/ui";
 import { formatPrice } from "@/lib/utils";
-import { PropertyState } from "@/types";
+import { PropertyState, Property } from "@/types";
+import { useSubscription } from "@/hooks/useSubscriptions";
+import {
+  useListProperties,
+  useUpdatePropertyState,
+  useUpdatePropertyComment,
+} from "@/hooks/useListProperties";
 
-// Mock data - will be replaced with API calls
-const mockProperties = [
-  {
-    id: "1",
-    price: 250000,
-    m2: 85,
-    bedrooms: 3,
-    phone: "+34 612 345 678",
-    ownerName: "Juan García",
-    sourceUrl: "https://example.com/property/1",
-    state: "new" as PropertyState,
-    comment: "",
-  },
-  {
-    id: "2",
-    price: 320000,
-    m2: 110,
-    bedrooms: 4,
-    phone: "+34 623 456 789",
-    ownerName: "María López",
-    sourceUrl: "https://example.com/property/2",
-    state: "contacted" as PropertyState,
-    comment: "Llamar por la tarde",
-  },
-  {
-    id: "3",
-    price: 180000,
-    m2: 65,
-    bedrooms: 2,
-    phone: "+34 634 567 890",
-    ownerName: "Pedro Martínez",
-    sourceUrl: "https://example.com/property/3",
-    state: "captured" as PropertyState,
-    comment: "Exclusiva firmada",
-  },
-  {
-    id: "4",
-    price: 450000,
-    m2: 150,
-    bedrooms: 5,
-    phone: "+34 645 678 901",
-    ownerName: "Ana Sánchez",
-    sourceUrl: "https://example.com/property/4",
-    state: "rejected" as PropertyState,
-    comment: "No interesado en agencias",
-  },
+const PROPERTY_STATES: { value: PropertyState; label: string }[] = [
+  { value: "new", label: "Nuevo" },
+  { value: "contacted", label: "Contactado" },
+  { value: "captured", label: "Captado" },
+  { value: "rejected", label: "Rechazado" },
 ];
+
+const STATE_FILTERS: { value: PropertyState | "all"; label: string }[] = [
+  { value: "all", label: "Todos" },
+  ...PROPERTY_STATES,
+];
+
+function PropertyRow({
+  property,
+  onStateChange,
+  onCommentChange,
+}: {
+  property: Property;
+  onStateChange: (propertyId: string, state: PropertyState) => void;
+  onCommentChange: (propertyId: string, comment: string) => void;
+}) {
+  const [isEditingComment, setIsEditingComment] = useState(false);
+  const [commentValue, setCommentValue] = useState(property.comment || "");
+
+  // Keep local state in sync with prop
+  const handleCommentSave = () => {
+    onCommentChange(property.id, commentValue);
+    setIsEditingComment(false);
+  };
+
+  const handleCommentCancel = () => {
+    setCommentValue(property.comment || "");
+    setIsEditingComment(false);
+  };
+
+  return (
+    <tr className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
+      <td className="px-4 py-4">
+        <div className="max-w-xs">
+          {property.title && (
+            <p className="truncate font-medium text-slate-900 dark:text-white">
+              {property.title}
+            </p>
+          )}
+          <p className="text-lg font-semibold text-primary">
+            {formatPrice(property.price * 100, "EUR")}
+          </p>
+          {property.location && (
+            <p className="truncate text-sm text-slate-500">
+              {property.location}
+            </p>
+          )}
+        </div>
+      </td>
+      <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-400">
+        {property.m2 ? `${property.m2} m²` : "-"}
+      </td>
+      <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-400">
+        {property.bedrooms ?? "-"}
+      </td>
+      <td className="whitespace-nowrap px-4 py-4">
+        {property.phone ? (
+          <a
+            href={`tel:${property.phone}`}
+            className="text-primary hover:underline"
+          >
+            {property.phone}
+          </a>
+        ) : (
+          <span className="text-slate-400">-</span>
+        )}
+      </td>
+      <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-400">
+        {property.ownerName || "-"}
+      </td>
+      <td className="whitespace-nowrap px-4 py-4">
+        <select
+          value={property.state}
+          onChange={(e) =>
+            onStateChange(property.id, e.target.value as PropertyState)
+          }
+          className={`rounded-md border px-2 py-1 text-sm font-medium transition-colors ${
+            property.state === "new"
+              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+              : property.state === "contacted"
+                ? "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                : property.state === "captured"
+                  ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  : "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+          }`}
+        >
+          {PROPERTY_STATES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="px-4 py-4">
+        {isEditingComment ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={commentValue}
+              onChange={(e) => setCommentValue(e.target.value)}
+              className="w-40 rounded border border-border-light px-2 py-1 text-sm dark:border-border-dark dark:bg-slate-800"
+              placeholder="Comentario..."
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCommentSave();
+                if (e.key === "Escape") handleCommentCancel();
+              }}
+            />
+            <button
+              onClick={handleCommentSave}
+              className="text-green-600 hover:text-green-700"
+              title="Guardar"
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={handleCommentCancel}
+              className="text-slate-400 hover:text-slate-600"
+              title="Cancelar"
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsEditingComment(true)}
+            className="group flex items-center gap-1 text-sm text-slate-500 hover:text-primary"
+          >
+            <span className="max-w-[150px] truncate">
+              {property.comment || "Añadir comentario"}
+            </span>
+            <svg
+              className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+              />
+            </svg>
+          </button>
+        )}
+      </td>
+      <td className="whitespace-nowrap px-4 py-4">
+        {property.sourceUrl && (
+          <a
+            href={property.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+          >
+            Ver anuncio
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </a>
+        )}
+      </td>
+    </tr>
+  );
+}
 
 export function ListDetailPage() {
   const { listId } = useParams<{ listId: string }>();
+  const navigate = useNavigate();
+  const [stateFilter, setStateFilter] = useState<PropertyState | "all">("all");
+
+  const {
+    data: subscription,
+    isLoading: isLoadingSubscription,
+    hasAccess,
+  } = useSubscription(listId || "");
+
+  const {
+    data,
+    isLoading: isLoadingProperties,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useListProperties({
+    listId: listId || "",
+    stateFilter,
+    enabled: !!listId && hasAccess,
+  });
+
+  const updateStateMutation = useUpdatePropertyState();
+  const updateCommentMutation = useUpdatePropertyComment();
+
+  const handleStateChange = useCallback(
+    (propertyId: string, state: PropertyState) => {
+      if (!listId) return;
+      updateStateMutation.mutate({ listId, propertyId, state });
+    },
+    [listId, updateStateMutation],
+  );
+
+  const handleCommentChange = useCallback(
+    (propertyId: string, comment: string) => {
+      if (!listId) return;
+      updateCommentMutation.mutate({ listId, propertyId, comment });
+    },
+    [listId, updateCommentMutation],
+  );
+
+  // Flatten all pages of properties
+  const properties = data?.pages.flatMap((page) => page.data) ?? [];
+  const totalProperties = data?.pages[0]?.total ?? 0;
+
+  // Loading state
+  if (isLoadingSubscription) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  // No access
+  if (!hasAccess) {
+    return (
+      <div>
+        <Card className="mx-auto max-w-md text-center">
+          <CardContent>
+            <div className="py-8">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                <svg
+                  className="h-8 w-8 text-red-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 15v2m0 0v2m0-2h2m-2 0H9m3-10V5a3 3 0 00-6 0v4m9-4.243V19a2 2 0 01-2 2H6a2 2 0 01-2-2V7.757a2 2 0 01.879-1.683l6-3.75a2 2 0 012.242 0l6 3.75A2 2 0 0118 7.757z"
+                  />
+                </svg>
+              </div>
+              <h2 className="mb-2 text-lg font-semibold text-slate-900 dark:text-white">
+                Acceso restringido
+              </h2>
+              <p className="mb-4 text-slate-500">
+                No tienes una suscripción activa para esta lista.
+              </p>
+              <Button onClick={() => navigate("/app/subscriptions")}>
+                Ver suscripciones
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-          Madrid Centro
-        </h1>
-        <p className="mt-1 text-slate-600 dark:text-slate-400">
-          Lista ID: {listId} • 156 inmuebles • Actualizado hoy
-        </p>
+      {/* Header */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <button
+            onClick={() => navigate("/app/dashboard")}
+            className="mb-2 flex items-center gap-1 text-sm text-slate-500 hover:text-primary"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            Volver al dashboard
+          </button>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+            {subscription?.listName}
+          </h1>
+          <p className="mt-1 text-slate-600 dark:text-slate-400">
+            {subscription?.listLocation} • {totalProperties} inmuebles
+          </p>
+        </div>
+
+        {/* State filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-slate-500">Filtrar:</span>
+          <div className="flex rounded-lg border border-border-light dark:border-border-dark">
+            {STATE_FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                onClick={() => setStateFilter(filter.value)}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
+                  stateFilter === filter.value
+                    ? "bg-primary text-white"
+                    : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {PROPERTY_STATES.map((state) => {
+          const count = properties.filter(
+            (p) => p.state === state.value,
+          ).length;
+          return (
+            <button
+              key={state.value}
+              onClick={() => setStateFilter(state.value)}
+              className={`rounded-lg border p-3 text-center transition-colors ${
+                stateFilter === state.value
+                  ? "border-primary bg-primary/5"
+                  : "border-border-light hover:border-primary/50 dark:border-border-dark"
+              }`}
+            >
+              <Badge variant={getStateVariant(state.value)} className="mb-1">
+                {state.label}
+              </Badge>
+              <p className="text-xl font-bold text-slate-900 dark:text-white">
+                {count}
+              </p>
+            </button>
+          );
+        })}
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border-light bg-slate-50 dark:border-border-dark dark:bg-slate-900/50">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Precio
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  M²
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Hab.
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Teléfono
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Propietario
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Estado
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Comentario
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-light dark:divide-border-dark">
-              {mockProperties.map((property) => (
-                <tr
-                  key={property.id}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-900/30"
+      {isLoadingProperties ? (
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      ) : properties.length === 0 ? (
+        <Card className="text-center">
+          <CardContent>
+            <div className="py-12">
+              <p className="text-slate-500">
+                {stateFilter === "all"
+                  ? "No hay inmuebles en esta lista."
+                  : `No hay inmuebles con estado "${getStateLabel(stateFilter)}".`}
+              </p>
+              {stateFilter !== "all" && (
+                <button
+                  onClick={() => setStateFilter("all")}
+                  className="mt-2 text-primary hover:underline"
                 >
-                  <td className="whitespace-nowrap px-4 py-4 font-medium">
-                    {formatPrice(property.price * 100, "EUR")}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-400">
-                    {property.m2} m²
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-400">
-                    {property.bedrooms}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4">
-                    <a
-                      href={`tel:${property.phone}`}
-                      className="text-primary hover:underline"
-                    >
-                      {property.phone}
-                    </a>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-400">
-                    {property.ownerName}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4">
-                    <Badge variant={getStateVariant(property.state)}>
-                      {getStateLabel(property.state)}
-                    </Badge>
-                  </td>
-                  <td className="max-w-xs truncate px-4 py-4 text-sm text-slate-500">
-                    {property.comment || "-"}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4">
-                    <div className="flex gap-2">
-                      <a
-                        href={property.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline"
-                      >
-                        Ver anuncio
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  Ver todos los inmuebles
+                </button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border-light bg-slate-50 dark:border-border-dark dark:bg-slate-900/50">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Inmueble
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      M²
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Hab.
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Teléfono
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Propietario
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Estado
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Comentario
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-light dark:divide-border-dark">
+                  {properties.map((property) => (
+                    <PropertyRow
+                      key={property.id}
+                      property={property}
+                      onStateChange={handleStateChange}
+                      onCommentChange={handleCommentChange}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-      {/* Pagination placeholder */}
-      <div className="mt-6 flex items-center justify-between">
-        <p className="text-sm text-slate-500">Mostrando 1-4 de 156 inmuebles</p>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" disabled>
-            Anterior
-          </Button>
-          <Button variant="secondary" size="sm">
-            Siguiente
-          </Button>
-        </div>
-      </div>
+          {/* Load more */}
+          {hasNextPage && (
+            <div className="mt-6 flex justify-center">
+              <Button
+                variant="secondary"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? (
+                  <>
+                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Cargando...
+                  </>
+                ) : (
+                  "Cargar más inmuebles"
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Count */}
+          <p className="mt-4 text-center text-sm text-slate-500">
+            Mostrando {properties.length} de {totalProperties} inmuebles
+          </p>
+        </>
+      )}
     </div>
   );
 }

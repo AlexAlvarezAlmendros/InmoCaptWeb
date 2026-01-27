@@ -45,14 +45,20 @@ class ApiClient {
       throw error;
     }
 
+    // Only set Content-Type if there's a body
+    const requestHeaders: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      ...headers,
+    };
+
+    if (body !== undefined) {
+      requestHeaders["Content-Type"] = "application/json";
+    }
+
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...headers,
-      },
-      body: body ? JSON.stringify(body) : undefined,
+      headers: requestHeaders,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
 
     // Handle 401 Unauthorized - redirect to login

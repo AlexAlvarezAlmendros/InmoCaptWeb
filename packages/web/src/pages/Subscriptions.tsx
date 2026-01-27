@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Card,
   CardHeader,
@@ -5,113 +7,248 @@ import {
   CardContent,
   Button,
   Badge,
+  Modal,
+  Input,
 } from "@/components/ui";
-import { formatPrice } from "@/lib/utils";
-
-// Mock data
-const mockAvailableLists = [
-  {
-    id: "list-4",
-    name: "Sevilla Centro",
-    location: "Sevilla",
-    priceCents: 3900,
-    currency: "EUR",
-    totalProperties: 67,
-  },
-  {
-    id: "list-5",
-    name: "Málaga Costa",
-    location: "Málaga",
-    priceCents: 4500,
-    currency: "EUR",
-    totalProperties: 112,
-  },
-  {
-    id: "list-6",
-    name: "Bilbao",
-    location: "Bilbao",
-    priceCents: 3500,
-    currency: "EUR",
-    totalProperties: 34,
-  },
-];
-
-const mockActiveSubscriptions = [
-  {
-    id: "1",
-    listName: "Madrid Centro",
-    renewalDate: "2026-02-25",
-    priceCents: 4900,
-    currency: "EUR",
-  },
-  {
-    id: "2",
-    listName: "Barcelona Eixample",
-    renewalDate: "2026-02-24",
-    priceCents: 4900,
-    currency: "EUR",
-  },
-  {
-    id: "3",
-    listName: "Valencia Ciutat Vella",
-    renewalDate: "2026-02-20",
-    priceCents: 3900,
-    currency: "EUR",
-  },
-];
+import { formatPrice, formatRelativeDate } from "@/lib/utils";
+import { useSubscriptions } from "@/hooks/useSubscriptions";
+import {
+  useAvailableLists,
+  useCreateCheckoutSession,
+  useCreatePortalSession,
+} from "@/hooks/useBilling";
+import { useCreateListRequest, useListRequests } from "@/hooks/useListRequests";
 
 export function SubscriptionsPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const checkoutStatus = searchParams.get("checkout");
+
+  const { data: subscriptions, isLoading: isLoadingSubscriptions } =
+    useSubscriptions();
+
+  const { data: availableLists, isLoading: isLoadingLists } =
+    useAvailableLists();
+
+  const createCheckoutSession = useCreateCheckoutSession();
+  const createPortalSession = useCreatePortalSession();
+  const createListRequest = useCreateListRequest();
+  const { data: listRequests } = useListRequests();
+
+  const [subscribingListId, setSubscribingListId] = useState<string | null>(
+    null,
+  );
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [requestLocation, setRequestLocation] = useState("");
+  const [requestNotes, setRequestNotes] = useState("");
+  const [requestSuccess, setRequestSuccess] = useState(false);
+
+  const activeSubscriptions = subscriptions?.filter(
+    (s) => s.status === "active",
+  );
+
+  const handleSubscribe = async (listId: string) => {
+    setSubscribingListId(listId);
+    try {
+      await createCheckoutSession.mutateAsync({ listId });
+    } catch (error) {
+      console.error("Failed to create checkout session:", error);
+    } finally {
+      setSubscribingListId(null);
+    }
+  };
+
+  const handleManageSubscriptions = async () => {
+    try {
+      await createPortalSession.mutateAsync();
+    } catch (error) {
+      console.error("Failed to create portal session:", error);
+    }
+  };
+
+  const handleOpenRequestModal = () => {
+    setRequestLocation("");
+    setRequestNotes("");
+    setRequestSuccess(false);
+    setIsRequestModalOpen(true);
+  };
+
+  const handleCloseRequestModal = () => {
+    setIsRequestModalOpen(false);
+    setRequestLocation("");
+    setRequestNotes("");
+    setRequestSuccess(false);
+  };
+
+  const handleSubmitRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestLocation.trim()) return;
+
+    try {
+      await createListRequest.mutateAsync({
+        location: requestLocation.trim(),
+        notes: requestNotes.trim() || undefined,
+      });
+      setRequestSuccess(true);
+    } catch (error) {
+      console.error("Failed to create list request:", error);
+    }
+  };
+
+  // Filter pending requests
+  const pendingRequests =
+    listRequests?.filter((r) => r.status === "pending") ?? [];
+
   return (
     <div className="space-y-8">
+      {/* Checkout status messages */}
+      {checkoutStatus === "success" && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+          <div className="flex items-center gap-2">
+            <svg
+              className="h-5 w-5 text-green-600 dark:text-green-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            <p className="font-medium text-green-700 dark:text-green-300">
+              ¡Suscripción completada con éxito!
+            </p>
+          </div>
+          <p className="mt-1 text-sm text-green-600 dark:text-green-400">
+            Ya puedes acceder a la lista desde tu dashboard.
+          </p>
+        </div>
+      )}
+      {checkoutStatus === "cancelled" && (
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
+          <p className="text-yellow-700 dark:text-yellow-300">
+            El proceso de pago fue cancelado. Puedes intentarlo de nuevo cuando
+            quieras.
+          </p>
+        </div>
+      )}
+
       {/* Active Subscriptions */}
       <section>
-        <h2 className="mb-4 text-xl font-bold text-slate-900 dark:text-white">
-          Suscripciones Activas
-        </h2>
-        <div className="overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border-light bg-slate-50 dark:border-border-dark dark:bg-slate-900/50">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Lista
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Precio mensual
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Renovación
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Estado
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-light dark:divide-border-dark">
-              {mockActiveSubscriptions.map((sub) => (
-                <tr key={sub.id}>
-                  <td className="px-4 py-4 font-medium">{sub.listName}</td>
-                  <td className="px-4 py-4">
-                    {formatPrice(sub.priceCents, sub.currency)}/mes
-                  </td>
-                  <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
-                    {sub.renewalDate}
-                  </td>
-                  <td className="px-4 py-4">
-                    <Badge variant="success">Activa</Badge>
-                  </td>
-                  <td className="px-4 py-4 text-right">
-                    <Button variant="danger" size="sm">
-                      Cancelar
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            Suscripciones Activas
+          </h2>
+          {activeSubscriptions && activeSubscriptions.length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleManageSubscriptions}
+              disabled={createPortalSession.isPending}
+            >
+              {createPortalSession.isPending ? (
+                <>
+                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Cargando...
+                </>
+              ) : (
+                "Gestionar pagos"
+              )}
+            </Button>
+          )}
         </div>
+
+        {isLoadingSubscriptions ? (
+          <div className="overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark">
+            <div className="animate-pulse p-8">
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="h-12 rounded bg-slate-200 dark:bg-slate-700"
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : !activeSubscriptions || activeSubscriptions.length === 0 ? (
+          <Card>
+            <CardContent>
+              <div className="py-8 text-center">
+                <p className="text-slate-500">
+                  No tienes suscripciones activas.
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Explora las listas disponibles abajo para empezar.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border-light bg-slate-50 dark:border-border-dark dark:bg-slate-900/50">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Lista
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Inmuebles
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Renovación
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Estado
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-light dark:divide-border-dark">
+                {activeSubscriptions.map((sub) => (
+                  <tr
+                    key={sub.id}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-900/30"
+                  >
+                    <td className="px-4 py-4">
+                      <div>
+                        <p className="font-medium text-slate-900 dark:text-white">
+                          {sub.listName}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          {sub.listLocation}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
+                      {sub.totalProperties}
+                    </td>
+                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
+                      {formatRelativeDate(sub.currentPeriodEnd)}
+                    </td>
+                    <td className="px-4 py-4">
+                      <Badge variant="success">Activa</Badge>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`/app/lists/${sub.listId}`)}
+                      >
+                        Ver lista
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {/* Available Lists */}
@@ -119,33 +256,93 @@ export function SubscriptionsPage() {
         <h2 className="mb-4 text-xl font-bold text-slate-900 dark:text-white">
           Listas Disponibles
         </h2>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {mockAvailableLists.map((list) => (
-            <Card key={list.id}>
-              <CardHeader>
-                <CardTitle>{list.name}</CardTitle>
-                <p className="text-sm text-slate-500">{list.location}</p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">Inmuebles</span>
-                    <span className="font-medium">{list.totalProperties}</span>
+
+        {isLoadingLists ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader>
+                  <div className="h-6 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
+                  <div className="mt-2 h-4 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="h-4 w-full rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="mt-4 h-10 rounded bg-slate-200 dark:bg-slate-700" />
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">Precio</span>
-                    <span className="font-semibold text-primary">
-                      {formatPrice(list.priceCents, list.currency)}/mes
-                    </span>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : !availableLists || availableLists.length === 0 ? (
+          <Card>
+            <CardContent>
+              <div className="py-8 text-center">
+                <p className="text-slate-500">
+                  No hay más listas disponibles para suscribirse.
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  ¿Necesitas una zona que no está cubierta? Solicita una nueva
+                  lista abajo.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {availableLists.map((list) => (
+              <Card key={list.id}>
+                <CardHeader>
+                  <CardTitle>{list.name}</CardTitle>
+                  <p className="text-sm text-slate-500">{list.location}</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">Inmuebles</span>
+                      <span className="font-medium text-slate-900 dark:text-white">
+                        {list.totalProperties}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">Precio</span>
+                      <span className="font-semibold text-primary">
+                        {formatPrice(list.priceCents, list.currency)}/mes
+                      </span>
+                    </div>
+                    {list.lastUpdatedAt && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-500">Actualizado</span>
+                        <span className="text-slate-400">
+                          {formatRelativeDate(list.lastUpdatedAt)}
+                        </span>
+                      </div>
+                    )}
+                    <Button
+                      variant="accent"
+                      className="mt-4 w-full"
+                      onClick={() => handleSubscribe(list.id)}
+                      disabled={
+                        subscribingListId === list.id ||
+                        createCheckoutSession.isPending
+                      }
+                    >
+                      {subscribingListId === list.id ? (
+                        <>
+                          <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Procesando...
+                        </>
+                      ) : (
+                        "Suscribirse"
+                      )}
+                    </Button>
                   </div>
-                  <Button variant="accent" className="mt-4 w-full">
-                    Suscribirse
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Request new list */}
@@ -158,10 +355,137 @@ export function SubscriptionsPage() {
             <p className="mb-4 text-slate-600 dark:text-slate-400">
               Solicita la creación de una nueva lista para tu zona de interés.
             </p>
-            <Button variant="secondary">Solicitar nueva lista</Button>
+            <Button variant="secondary" onClick={handleOpenRequestModal}>
+              Solicitar nueva lista
+            </Button>
+
+            {/* Show pending requests */}
+            {pendingRequests.length > 0 && (
+              <div className="mt-6 border-t border-border-light pt-4 dark:border-border-dark">
+                <h4 className="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Tus solicitudes pendientes
+                </h4>
+                <div className="space-y-2">
+                  {pendingRequests.map((request) => (
+                    <div
+                      key={request.id}
+                      className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-900 dark:text-white">
+                          {request.location}
+                        </p>
+                        {request.notes && (
+                          <p className="text-sm text-slate-500">
+                            {request.notes}
+                          </p>
+                        )}
+                      </div>
+                      <Badge variant="warning">Pendiente</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>
+
+      {/* Request Modal */}
+      <Modal
+        isOpen={isRequestModalOpen}
+        onClose={handleCloseRequestModal}
+        title="Solicitar nueva lista"
+        description="Indícanos la zona o ubicación que te interesa y la revisaremos."
+        size="md"
+      >
+        {requestSuccess ? (
+          <div className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+              <svg
+                className="h-8 w-8 text-green-600 dark:text-green-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
+            <h3 className="mb-2 text-lg font-semibold text-slate-900 dark:text-white">
+              ¡Solicitud enviada!
+            </h3>
+            <p className="mb-6 text-slate-500">
+              Revisaremos tu solicitud y te notificaremos cuando la lista esté
+              disponible.
+            </p>
+            <Button onClick={handleCloseRequestModal}>Cerrar</Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmitRequest} className="space-y-4">
+            <div>
+              <label
+                htmlFor="location"
+                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              >
+                Ubicación / Zona *
+              </label>
+              <Input
+                id="location"
+                type="text"
+                placeholder="Ej: Zaragoza Centro, Costa del Sol..."
+                value={requestLocation}
+                onChange={(e) => setRequestLocation(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="notes"
+                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              >
+                Notas adicionales (opcional)
+              </label>
+              <textarea
+                id="notes"
+                placeholder="Cualquier detalle adicional que nos ayude..."
+                value={requestNotes}
+                onChange={(e) => setRequestNotes(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-border-light bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-border-dark dark:bg-slate-900 dark:text-white dark:placeholder-slate-500"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleCloseRequestModal}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  !requestLocation.trim() || createListRequest.isPending
+                }
+              >
+                {createListRequest.isPending ? (
+                  <>
+                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Enviando...
+                  </>
+                ) : (
+                  "Enviar solicitud"
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }

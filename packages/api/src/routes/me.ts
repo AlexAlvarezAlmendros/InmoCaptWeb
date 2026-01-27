@@ -41,6 +41,9 @@ export async function meRoutes(fastify: FastifyInstance) {
           currentPeriodEnd: sub.current_period_end,
           priceCents: sub.price_cents,
           currency: sub.currency,
+          lastUpdatedAt: sub.last_updated_at,
+          totalProperties: sub.total_properties,
+          newPropertiesCount: sub.new_properties_count,
         })),
       };
     },

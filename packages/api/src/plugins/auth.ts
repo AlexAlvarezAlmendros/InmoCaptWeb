@@ -5,7 +5,7 @@ import { env } from "../config/env.js";
 import { db } from "../config/database.js";
 
 // Auth0 namespace for custom claims
-const AUTH0_NAMESPACE = "https://inmocapt.com";
+const AUTH0_NAMESPACE = "https://otp-records.com";
 
 // JWKS client for Auth0
 const client = jwksClient({
@@ -76,8 +76,12 @@ export async function authenticate(
     // Extract user info from token
     request.user = {
       sub: decoded.sub as string,
-      email: decoded.email as string | undefined,
-      roles: (decoded[`${AUTH0_NAMESPACE}/roles`] as string[]) || [],
+      email: (decoded.email || decoded[`${AUTH0_NAMESPACE}/email`]) as
+        | string
+        | undefined,
+      roles: ((decoded[`${AUTH0_NAMESPACE}/roles`] as string[]) || []).map(
+        (r) => r.toLowerCase(),
+      ),
       permissions: (decoded.permissions as string[]) || [],
     };
   } catch (error) {

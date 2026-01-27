@@ -18,6 +18,9 @@ export interface UserSubscription {
   current_period_end: string | null;
   price_cents: number;
   currency: string;
+  last_updated_at: string;
+  total_properties: number;
+  new_properties_count: number;
 }
 
 /**
@@ -110,7 +113,7 @@ export async function updateStripeCustomerId(
 }
 
 /**
- * Get user's active subscriptions with list details
+ * Get user's active subscriptions with list details and property stats
  */
 export async function getUserSubscriptions(
   userId: string,
@@ -125,14 +128,23 @@ export async function getUserSubscriptions(
         s.status,
         s.current_period_end,
         l.price_cents,
-        l.currency
+        l.currency,
+        l.last_updated_at,
+        (SELECT COUNT(*) FROM properties WHERE list_id = l.id) as total_properties,
+        (SELECT COUNT(*) FROM properties p 
+         WHERE p.list_id = l.id 
+         AND NOT EXISTS (
+           SELECT 1 FROM property_agent_state pas 
+           WHERE pas.property_id = p.id AND pas.user_id = ?
+         )
+        ) as new_properties_count
       FROM subscriptions s
       JOIN lists l ON l.id = s.list_id
       WHERE s.user_id = ?
         AND s.status IN ('active', 'past_due')
       ORDER BY s.created_at DESC
     `,
-    args: [userId],
+    args: [userId, userId],
   });
 
   return result.rows as unknown as UserSubscription[];

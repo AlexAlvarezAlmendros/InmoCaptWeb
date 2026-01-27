@@ -14,3 +14,6 @@ export type { InputProps } from "./Input";
 
 export { Badge, getStateVariant, getStateLabel } from "./Badge";
 export type { BadgeProps } from "./Badge";
+
+export { Modal, ConfirmDialog } from "./Modal";
+export type { ModalProps, ConfirmDialogProps } from "./Modal";

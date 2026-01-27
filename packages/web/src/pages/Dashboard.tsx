@@ -5,54 +5,68 @@ import {
   CardContent,
   Badge,
 } from "@/components/ui";
-import { formatRelativeDate, formatPrice } from "@/lib/utils";
+import { formatRelativeDate } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-
-// Mock data - will be replaced with API calls
-const mockSubscriptions = [
-  {
-    id: "1",
-    list: {
-      id: "list-1",
-      name: "Madrid Centro",
-      location: "Madrid",
-      priceCents: 4900,
-      currency: "EUR",
-      lastUpdatedAt: "2026-01-25T10:00:00Z",
-      totalProperties: 156,
-      newPropertiesSinceLastUpdate: 12,
-    },
-  },
-  {
-    id: "2",
-    list: {
-      id: "list-2",
-      name: "Barcelona Eixample",
-      location: "Barcelona",
-      priceCents: 4900,
-      currency: "EUR",
-      lastUpdatedAt: "2026-01-24T15:30:00Z",
-      totalProperties: 89,
-      newPropertiesSinceLastUpdate: 5,
-    },
-  },
-  {
-    id: "3",
-    list: {
-      id: "list-3",
-      name: "Valencia Ciutat Vella",
-      location: "Valencia",
-      priceCents: 3900,
-      currency: "EUR",
-      lastUpdatedAt: "2026-01-20T09:00:00Z",
-      totalProperties: 45,
-      newPropertiesSinceLastUpdate: 0,
-    },
-  },
-];
+import { useSubscriptions } from "@/hooks/useSubscriptions";
 
 export function DashboardPage() {
   const navigate = useNavigate();
+  const { data: subscriptions, isLoading, error } = useSubscriptions();
+
+  if (isLoading) {
+    return (
+      <div>
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+            Mis Listas
+          </h1>
+          <p className="mt-1 text-slate-600 dark:text-slate-400">
+            Accede a tus listados FSBO suscritos
+          </p>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-6 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="mt-2 h-4 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="h-4 w-full rounded bg-slate-200 dark:bg-slate-700" />
+                  <div className="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
+                  <div className="h-4 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+            Mis Listas
+          </h1>
+        </div>
+        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+          <CardContent>
+            <p className="text-red-600 dark:text-red-400">
+              Error al cargar las suscripciones. Inténtalo de nuevo más tarde.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const activeSubscriptions = subscriptions?.filter(
+    (s) => s.status === "active",
+  );
 
   return (
     <div>
@@ -65,67 +79,91 @@ export function DashboardPage() {
         </p>
       </div>
 
-      {mockSubscriptions.length === 0 ? (
+      {!activeSubscriptions || activeSubscriptions.length === 0 ? (
         <Card className="text-center">
           <CardContent>
-            <p className="text-slate-500">No tienes suscripciones activas.</p>
-            <button
-              onClick={() => navigate("/app/subscriptions")}
-              className="mt-4 text-primary hover:underline"
-            >
-              Explorar listas disponibles
-            </button>
+            <div className="py-8">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                <svg
+                  className="h-8 w-8 text-slate-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
+                </svg>
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-slate-900 dark:text-white">
+                No tienes suscripciones activas
+              </h3>
+              <p className="mb-4 text-slate-500">
+                Explora las listas disponibles y suscríbete para acceder a los
+                inmuebles FSBO.
+              </p>
+              <button
+                onClick={() => navigate("/app/subscriptions")}
+                className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
+              >
+                Explorar listas disponibles
+              </button>
+            </div>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {mockSubscriptions.map((subscription) => (
+          {activeSubscriptions.map((subscription) => (
             <Card
               key={subscription.id}
-              className="cursor-pointer hover:border-primary"
-              onClick={() => navigate(`/app/lists/${subscription.list.id}`)}
+              className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
+              onClick={() => navigate(`/app/lists/${subscription.listId}`)}
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
-                  <CardTitle>{subscription.list.name}</CardTitle>
+                  <CardTitle className="line-clamp-1">
+                    {subscription.listName}
+                  </CardTitle>
                   <Badge variant="success">Activa</Badge>
                 </div>
                 <p className="text-sm text-slate-500">
-                  {subscription.list.location}
+                  {subscription.listLocation}
                 </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">Inmuebles totales</span>
-                    <span className="font-medium">
-                      {subscription.list.totalProperties}
+                    <span className="font-medium text-slate-900 dark:text-white">
+                      {subscription.totalProperties}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">Nuevos</span>
-                    <span className="font-medium text-accent">
-                      +{subscription.list.newPropertiesSinceLastUpdate}
-                    </span>
+                    {subscription.newPropertiesCount > 0 ? (
+                      <Badge variant="success" className="font-medium">
+                        +{subscription.newPropertiesCount}
+                      </Badge>
+                    ) : (
+                      <span className="text-slate-400">0</span>
+                    )}
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">Actualizado</span>
                     <span className="text-slate-600 dark:text-slate-400">
-                      {formatRelativeDate(subscription.list.lastUpdatedAt)}
+                      {subscription.lastUpdatedAt
+                        ? formatRelativeDate(subscription.lastUpdatedAt)
+                        : "Sin datos"}
                     </span>
                   </div>
                   <div className="border-t border-border-light pt-3 dark:border-border-dark">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-500">
-                        Precio mensual
-                      </span>
-                      <span className="font-semibold text-primary">
-                        {formatPrice(
-                          subscription.list.priceCents,
-                          subscription.list.currency,
-                        )}
-                      </span>
-                    </div>
+                    <span className="text-xs text-slate-400">
+                      Renovación:{" "}
+                      {formatRelativeDate(subscription.currentPeriodEnd)}
+                    </span>
                   </div>
                 </div>
               </CardContent>

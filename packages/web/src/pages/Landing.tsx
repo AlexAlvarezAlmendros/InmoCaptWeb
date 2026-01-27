@@ -37,20 +37,9 @@ export function LandingPage() {
             particulares. Datos actualizados, contactos directos y gestión
             profesional de tus captaciones.
           </p>
-          <div className="mt-10 flex items-center justify-center gap-4">
+          <div className="mt-10 flex items-center justify-center">
             <Button size="lg" variant="accent" onClick={handleGetStarted}>
               Empezar ahora
-            </Button>
-            <Button
-              size="lg"
-              variant="secondary"
-              onClick={() => {
-                document
-                  .getElementById("demo")
-                  ?.scrollIntoView({ behavior: "smooth" });
-              }}
-            >
-              Ver demo
             </Button>
           </div>
         </div>
@@ -214,7 +203,7 @@ export function LandingPage() {
           <h2 className="text-3xl font-bold text-white">
             ¿Listo para empezar?
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-primary-light">
+          <p className="mx-auto mt-4 max-w-xl text-lg text-white/90">
             Únete a cientos de agentes que ya están captando con InmoCapt.
           </p>
           <Button

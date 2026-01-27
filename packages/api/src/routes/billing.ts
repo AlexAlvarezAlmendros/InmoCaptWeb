@@ -14,6 +14,7 @@ import {
   cancelSubscriptionByStripeId,
 } from "../services/subscriptionService.js";
 import { zodValidate, checkoutSessionSchema } from "../schemas/validation.js";
+import { getListById } from "../services/listService.js";
 
 export async function billingRoutes(fastify: FastifyInstance) {
   // Create checkout session for subscribing to a list
@@ -29,10 +30,16 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
       const userId = request.user.sub;
       const userEmail = request.user.email;
-      const { listId, priceId } = result.data;
+      const { listId } = result.data;
 
       // Ensure user exists in DB
       await ensureUserExists(request.user);
+
+      // Get list details to get the price
+      const list = await getListById(listId);
+      if (!list) {
+        return reply.code(404).send({ error: "List not found" });
+      }
 
       try {
         // Check if user already has a Stripe customer ID
@@ -53,7 +60,17 @@ export async function billingRoutes(fastify: FastifyInstance) {
           mode: "subscription",
           line_items: [
             {
-              price: priceId,
+              price_data: {
+                currency: list.currency.toLowerCase(),
+                product_data: {
+                  name: `Suscripción: ${list.name}`,
+                  description: `Acceso a listados FSBO en ${list.location}`,
+                },
+                unit_amount: list.priceCents,
+                recurring: {
+                  interval: "month",
+                },
+              },
               quantity: 1,
             },
           ],

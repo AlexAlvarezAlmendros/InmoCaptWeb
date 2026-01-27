@@ -10,6 +10,10 @@ export interface ListRequest {
   created_at: string;
 }
 
+export interface ListRequestWithUser extends ListRequest {
+  user_email: string | null;
+}
+
 export interface CreateListRequestParams {
   userId: string;
   location: string;
@@ -54,23 +58,27 @@ export async function getListRequestsByUser(
 }
 
 /**
- * Get all list requests (admin)
+ * Get all list requests (admin) with user email
  */
 export async function getAllListRequests(
   status?: string,
-): Promise<ListRequest[]> {
-  let sql = "SELECT * FROM list_requests";
+): Promise<ListRequestWithUser[]> {
+  let sql = `
+    SELECT lr.*, u.email as user_email
+    FROM list_requests lr
+    LEFT JOIN users u ON lr.user_id = u.id
+  `;
   const args: string[] = [];
 
   if (status) {
-    sql += " WHERE status = ?";
+    sql += " WHERE lr.status = ?";
     args.push(status);
   }
 
-  sql += " ORDER BY created_at DESC";
+  sql += " ORDER BY lr.created_at DESC";
 
   const result = await db.execute({ sql, args });
-  return result.rows as unknown as ListRequest[];
+  return result.rows as unknown as ListRequestWithUser[];
 }
 
 /**
@@ -103,4 +111,46 @@ export async function getListRequestById(
   });
 
   return (result.rows[0] as unknown as ListRequest) || null;
+}
+
+/**
+ * Approve a list request and create the associated list
+ */
+export async function approveListRequest(
+  requestId: string,
+  listData: {
+    name: string;
+    location: string;
+    priceCents: number;
+    currency: string;
+  },
+): Promise<{ request: ListRequest; listId: string }> {
+  // Import here to avoid circular dependency
+  const { createList } = await import("./listService.js");
+
+  // Create the list
+  const newList = await createList(listData);
+
+  // Update the request status
+  await updateListRequestStatus(requestId, "approved", newList.id);
+
+  // Get updated request
+  const updatedRequest = await getListRequestById(requestId);
+
+  return {
+    request: updatedRequest!,
+    listId: newList.id,
+  };
+}
+
+/**
+ * Reject a list request
+ */
+export async function rejectListRequest(
+  requestId: string,
+): Promise<ListRequest> {
+  await updateListRequestStatus(requestId, "rejected");
+
+  const updatedRequest = await getListRequestById(requestId);
+  return updatedRequest!;
 }

@@ -8,8 +8,43 @@ import {
   propertyStateSchema,
   propertyCommentSchema,
 } from "../schemas/validation.js";
+import {
+  getPropertiesWithAgentState,
+  updatePropertyState,
+  updatePropertyComment,
+  propertyExistsInList,
+  type PropertyState,
+} from "../services/agentStateService.js";
+import { ensureUserExists } from "../services/userService.js";
+import { getAvailableListsForUser } from "../services/listService.js";
 
 export async function listsRoutes(fastify: FastifyInstance) {
+  // Get available lists for user to subscribe to
+  fastify.get(
+    "/available",
+    { preHandler: [authenticate] },
+    async (request, _reply) => {
+      const userId = request.user.sub;
+
+      // Ensure user exists
+      await ensureUserExists(request.user);
+
+      const lists = await getAvailableListsForUser(userId);
+
+      return {
+        data: lists.map((list) => ({
+          id: list.id,
+          name: list.name,
+          location: list.location,
+          priceCents: list.priceCents,
+          currency: list.currency,
+          totalProperties: list.totalProperties,
+          lastUpdatedAt: list.lastUpdatedAt,
+        })),
+      };
+    },
+  );
+
   // Get properties from a list (requires subscription)
   fastify.get(
     "/:listId/properties",
@@ -29,7 +64,14 @@ export async function listsRoutes(fastify: FastifyInstance) {
 
       const { listId } = paramsResult.data;
       const { cursor, limit = 50 } = queryResult.data;
+      const stateFilter = (request.query as { state?: string }).state as
+        | PropertyState
+        | "all"
+        | undefined;
       const userId = request.user.sub;
+
+      // Ensure user exists
+      await ensureUserExists(request.user);
 
       // Check subscription
       const hasSubscription = await requireSubscription(userId, listId);
@@ -39,16 +81,14 @@ export async function listsRoutes(fastify: FastifyInstance) {
           .send({ error: "No active subscription for this list" });
       }
 
-      // TODO: Fetch properties from database with cursor pagination
-      void cursor;
-      void limit;
+      // Fetch properties with agent state
+      const result = await getPropertiesWithAgentState(userId, listId, {
+        cursor,
+        limit,
+        stateFilter: stateFilter || "all",
+      });
 
-      return {
-        data: [],
-        cursor: null,
-        hasMore: false,
-        total: 0,
-      };
+      return result;
     },
   );
 
@@ -73,6 +113,9 @@ export async function listsRoutes(fastify: FastifyInstance) {
       const { state } = bodyResult.data;
       const userId = request.user.sub;
 
+      // Ensure user exists
+      await ensureUserExists(request.user);
+
       // Check subscription
       const hasSubscription = await requireSubscription(userId, listId);
       if (!hasSubscription) {
@@ -81,11 +124,21 @@ export async function listsRoutes(fastify: FastifyInstance) {
           .send({ error: "No active subscription for this list" });
       }
 
-      // TODO: Update state in database
-      return {
-        message: "State updated",
+      // Check property exists in list
+      const exists = await propertyExistsInList(propertyId, listId);
+      if (!exists) {
+        return reply.code(404).send({ error: "Property not found" });
+      }
+
+      // Update state
+      const result = await updatePropertyState(
+        userId,
         propertyId,
-        state,
+        state as PropertyState,
+      );
+
+      return {
+        data: result,
       };
     },
   );
@@ -111,6 +164,9 @@ export async function listsRoutes(fastify: FastifyInstance) {
       const { comment } = bodyResult.data;
       const userId = request.user.sub;
 
+      // Ensure user exists
+      await ensureUserExists(request.user);
+
       // Check subscription
       const hasSubscription = await requireSubscription(userId, listId);
       if (!hasSubscription) {
@@ -119,11 +175,17 @@ export async function listsRoutes(fastify: FastifyInstance) {
           .send({ error: "No active subscription for this list" });
       }
 
-      // TODO: Update comment in database
+      // Check property exists in list
+      const exists = await propertyExistsInList(propertyId, listId);
+      if (!exists) {
+        return reply.code(404).send({ error: "Property not found" });
+      }
+
+      // Update comment
+      const result = await updatePropertyComment(userId, propertyId, comment);
+
       return {
-        message: "Comment updated",
-        propertyId,
-        comment,
+        data: result,
       };
     },
   );

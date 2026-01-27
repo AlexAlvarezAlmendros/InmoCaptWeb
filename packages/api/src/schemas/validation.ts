@@ -16,7 +16,6 @@ export type UpdatePreferencesInput = z.infer<typeof updatePreferencesSchema>;
 
 export const checkoutSessionSchema = z.object({
   listId: z.string().uuid("Invalid list ID"),
-  priceId: z.string().min(1, "Price ID is required"),
 });
 
 export type CheckoutSessionInput = z.infer<typeof checkoutSessionSchema>;
@@ -96,23 +95,54 @@ export const createListSchema = z.object({
 
 export type CreateListInput = z.infer<typeof createListSchema>;
 
+// Schema for simplified/internal property format
+export const propertyInputSchema = z.object({
+  price: z.number().int().min(0),
+  m2: z.number().int().min(0).optional(),
+  bedrooms: z.number().int().min(0).optional(),
+  phone: z.string().max(50).optional(),
+  ownerName: z.string().max(200).optional(),
+  sourceUrl: z.string().url().optional(),
+  rawPayload: z.record(z.unknown()).optional(),
+});
+
+// Schema for Idealista raw property format
+export const idealistaPropertySchema = z.object({
+  titulo: z.string().optional(),
+  precio: z.string(), // "90.000€"
+  ubicacion: z.string().optional(),
+  habitaciones: z.string().nullable().optional(), // "3 hab." or null
+  metros: z.string().nullable().optional(), // "70 m²" or null
+  url: z.string().url(),
+  descripcion: z.string().nullable().optional(),
+  anunciante: z.string().optional(),
+  fecha_scraping: z.string().optional(),
+});
+
+// Schema for Idealista JSON format
+export const idealistaUploadSchema = z.object({
+  timestamp: z.string().optional(),
+  url: z.string().optional(),
+  total: z.number().optional(),
+  particulares: z.number().optional(),
+  inmobiliarias: z.number().optional(),
+  viviendas: z.object({
+    todas: z
+      .array(idealistaPropertySchema)
+      .min(1, "At least one property is required"),
+  }),
+});
+
+// Schema for simplified/internal format
 export const uploadPropertiesSchema = z.object({
   properties: z
-    .array(
-      z.object({
-        price: z.number().int().min(0),
-        m2: z.number().int().min(0).optional(),
-        bedrooms: z.number().int().min(0).optional(),
-        phone: z.string().max(50).optional(),
-        ownerName: z.string().max(200).optional(),
-        sourceUrl: z.string().url().optional(),
-        rawPayload: z.record(z.unknown()).optional(),
-      }),
-    )
+    .array(propertyInputSchema)
     .min(1, "At least one property is required"),
 });
 
 export type UploadPropertiesInput = z.infer<typeof uploadPropertiesSchema>;
+export type IdealistaUploadInput = z.infer<typeof idealistaUploadSchema>;
+export type IdealistaProperty = z.infer<typeof idealistaPropertySchema>;
 
 export const listRequestActionSchema = z.object({
   listId: z.string().uuid().optional(), // For approve action

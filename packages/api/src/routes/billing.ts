@@ -12,6 +12,7 @@ import {
   createSubscription,
   updateSubscriptionByStripeId,
   cancelSubscriptionByStripeId,
+  getSubscriptionByIdAndUser,
 } from "../services/subscriptionService.js";
 import { zodValidate, checkoutSessionSchema } from "../schemas/validation.js";
 import { getListById } from "../services/listService.js";
@@ -128,13 +129,80 @@ export async function billingRoutes(fastify: FastifyInstance) {
     },
   );
 
+  // Cancel a subscription
+  fastify.post(
+    "/cancel-subscription",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const userId = request.user.sub;
+      const { subscriptionId } = request.body as { subscriptionId: string };
+
+      if (!subscriptionId) {
+        return reply.code(400).send({ error: "Subscription ID is required" });
+      }
+
+      // Get the subscription and verify it belongs to this user
+      const subscription = await getSubscriptionByIdAndUser(
+        subscriptionId,
+        userId,
+      );
+
+      if (!subscription) {
+        return reply.code(404).send({ error: "Subscription not found" });
+      }
+
+      if (subscription.status !== "active") {
+        return reply.code(400).send({ error: "Subscription is not active" });
+      }
+
+      try {
+        const stripeSubId = subscription.stripe_subscription_id;
+
+        fastify.log.info(
+          `Attempting to cancel Stripe subscription: ${stripeSubId} for DB subscription: ${subscriptionId}`,
+        );
+
+        if (!stripeSubId || !stripeSubId.startsWith("sub_")) {
+          fastify.log.error(`Invalid Stripe subscription ID: ${stripeSubId}`);
+          return reply
+            .code(400)
+            .send({ error: "Invalid Stripe subscription ID in database" });
+        }
+
+        // Cancel subscription in Stripe (immediately)
+        const canceledSub = await stripe.subscriptions.cancel(stripeSubId);
+
+        fastify.log.info(
+          `Stripe subscription ${stripeSubId} canceled. Status: ${canceledSub.status}`,
+        );
+
+        // The webhook will handle updating the DB status
+        // But we can also update it here for immediate feedback
+        await cancelSubscriptionByStripeId(stripeSubId);
+
+        fastify.log.info(
+          `DB subscription ${subscriptionId} marked as canceled`,
+        );
+
+        return { message: "Subscription canceled successfully" };
+      } catch (error) {
+        fastify.log.error("Failed to cancel subscription:", error);
+        return reply.code(500).send({ error: "Failed to cancel subscription" });
+      }
+    },
+  );
+
   // Stripe webhook handler
   fastify.post(
     "/webhook",
-    {},
     async (request: FastifyRequest, reply: FastifyReply) => {
       const sig = request.headers["stripe-signature"] as string;
-      const rawBody = (request as unknown as { rawBody: Buffer }).rawBody;
+      const rawBody = request.rawBody;
+
+      if (!rawBody) {
+        fastify.log.error("No raw body found in request");
+        return reply.code(400).send({ error: "No raw body" });
+      }
 
       let event: Stripe.Event;
 
@@ -164,9 +232,16 @@ export async function billingRoutes(fastify: FastifyInstance) {
             // Get subscription details from Stripe
             const subscription =
               await stripe.subscriptions.retrieve(subscriptionId);
+
+            fastify.log.info(
+              `Stripe subscription period end timestamp: ${subscription.current_period_end}`,
+            );
+
             const periodEnd = new Date(
               subscription.current_period_end * 1000,
             ).toISOString();
+
+            fastify.log.info(`Converted period end: ${periodEnd}`);
 
             await createSubscription({
               userId,
@@ -186,9 +261,12 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
         case "customer.subscription.updated": {
           const subscription = event.data.object as Stripe.Subscription;
-          const periodEnd = new Date(
-            subscription.current_period_end * 1000,
-          ).toISOString();
+
+          // Safely handle period end date
+          const periodEndTimestamp = subscription.current_period_end;
+          const periodEnd = periodEndTimestamp
+            ? new Date(periodEndTimestamp * 1000).toISOString()
+            : null;
 
           // Map Stripe status to our status
           let status = "active";

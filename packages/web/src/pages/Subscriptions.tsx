@@ -10,12 +10,13 @@ import {
   Modal,
   Input,
 } from "@/components/ui";
-import { formatPrice, formatRelativeDate } from "@/lib/utils";
+import { formatPrice, formatDate, formatRelativeDate } from "@/lib/utils";
 import { useSubscriptions } from "@/hooks/useSubscriptions";
 import {
   useAvailableLists,
   useCreateCheckoutSession,
   useCreatePortalSession,
+  useCancelSubscription,
 } from "@/hooks/useBilling";
 import { useCreateListRequest, useListRequests } from "@/hooks/useListRequests";
 
@@ -32,12 +33,21 @@ export function SubscriptionsPage() {
 
   const createCheckoutSession = useCreateCheckoutSession();
   const createPortalSession = useCreatePortalSession();
+  const cancelSubscription = useCancelSubscription();
   const createListRequest = useCreateListRequest();
   const { data: listRequests } = useListRequests();
 
   const [subscribingListId, setSubscribingListId] = useState<string | null>(
     null,
   );
+  const [cancellingSubscriptionId, setCancellingSubscriptionId] = useState<
+    string | null
+  >(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [subscriptionToCancel, setSubscriptionToCancel] = useState<{
+    id: string;
+    listName: string;
+  } | null>(null);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [requestLocation, setRequestLocation] = useState("");
   const [requestNotes, setRequestNotes] = useState("");
@@ -63,6 +73,32 @@ export function SubscriptionsPage() {
       await createPortalSession.mutateAsync();
     } catch (error) {
       console.error("Failed to create portal session:", error);
+    }
+  };
+
+  const handleOpenCancelModal = (subscriptionId: string, listName: string) => {
+    setSubscriptionToCancel({ id: subscriptionId, listName });
+    setShowCancelModal(true);
+  };
+
+  const handleCloseCancelModal = () => {
+    setShowCancelModal(false);
+    setSubscriptionToCancel(null);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!subscriptionToCancel) return;
+
+    setCancellingSubscriptionId(subscriptionToCancel.id);
+    try {
+      await cancelSubscription.mutateAsync({
+        subscriptionId: subscriptionToCancel.id,
+      });
+      handleCloseCancelModal();
+    } catch (error) {
+      console.error("Failed to cancel subscription:", error);
+    } finally {
+      setCancellingSubscriptionId(null);
     }
   };
 
@@ -229,19 +265,32 @@ export function SubscriptionsPage() {
                       {sub.totalProperties}
                     </td>
                     <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
-                      {formatRelativeDate(sub.currentPeriodEnd)}
+                      {sub.currentPeriodEnd
+                        ? formatDate(sub.currentPeriodEnd)
+                        : "-"}
                     </td>
                     <td className="px-4 py-4">
                       <Badge variant="success">Activa</Badge>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => navigate(`/app/lists/${sub.listId}`)}
-                      >
-                        Ver lista
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => navigate(`/app/lists/${sub.listId}`)}
+                        >
+                          Ver lista
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() =>
+                            handleOpenCancelModal(sub.id, sub.listName)
+                          }
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -485,6 +534,49 @@ export function SubscriptionsPage() {
             </div>
           </form>
         )}
+      </Modal>
+
+      {/* Cancel Subscription Modal */}
+      <Modal
+        isOpen={showCancelModal}
+        onClose={handleCloseCancelModal}
+        title="Cancelar suscripción"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-slate-600 dark:text-slate-400">
+            ¿Estás seguro de que quieres cancelar tu suscripción a{" "}
+            <span className="font-medium text-slate-900 dark:text-white">
+              {subscriptionToCancel?.listName}
+            </span>
+            ?
+          </p>
+          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
+            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+              Perderás el acceso inmediato a la lista y no podrás ver los
+              inmuebles ni sus detalles.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={handleCloseCancelModal}>
+              Mantener suscripción
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleConfirmCancel}
+              disabled={cancelSubscription.isPending}
+            >
+              {cancellingSubscriptionId === subscriptionToCancel?.id ? (
+                <>
+                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Cancelando...
+                </>
+              ) : (
+                "Sí, cancelar suscripción"
+              )}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

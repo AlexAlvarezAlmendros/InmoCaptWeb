@@ -79,3 +79,23 @@ export function useCreatePortalSession() {
     },
   });
 }
+
+export function useCancelSubscription() {
+  const apiClient = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ subscriptionId }: { subscriptionId: string }) => {
+      const response = await apiClient.post<{ message: string }>(
+        "/billing/cancel-subscription",
+        { subscriptionId },
+      );
+      return response;
+    },
+    onSuccess: () => {
+      // Invalidate subscriptions to refresh the list
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["availableLists"] });
+    },
+  });
+}

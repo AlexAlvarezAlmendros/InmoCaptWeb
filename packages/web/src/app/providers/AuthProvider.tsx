@@ -1,7 +1,7 @@
-import { Auth0Provider } from '@auth0/auth0-react';
-import { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { env } from '@/lib/env';
+import { Auth0Provider } from "@auth0/auth0-react";
+import { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { env } from "@/lib/env";
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -11,7 +11,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const navigate = useNavigate();
 
   const onRedirectCallback = (appState?: { returnTo?: string }) => {
-    navigate(appState?.returnTo || '/app/dashboard');
+    navigate(appState?.returnTo || "/app/dashboard");
   };
 
   return (
@@ -23,7 +23,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         audience: env.AUTH0_AUDIENCE,
       }}
       onRedirectCallback={onRedirectCallback}
-      cacheLocation="memory"
+      cacheLocation="localstorage"
+      useRefreshTokens={true}
     >
       {children}
     </Auth0Provider>

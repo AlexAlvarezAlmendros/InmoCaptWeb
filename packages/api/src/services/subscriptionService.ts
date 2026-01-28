@@ -95,6 +95,34 @@ export async function getSubscriptionByStripeId(stripeSubscriptionId: string) {
 }
 
 /**
+ * Get subscription by ID and user ID (for authorization)
+ */
+export async function getSubscriptionByIdAndUser(
+  subscriptionId: string,
+  userId: string,
+) {
+  const result = await db.execute({
+    sql: "SELECT * FROM subscriptions WHERE id = ? AND user_id = ?",
+    args: [subscriptionId, userId],
+  });
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return result.rows[0] as {
+    id: string;
+    user_id: string;
+    list_id: string;
+    stripe_subscription_id: string;
+    stripe_customer_id: string;
+    status: string;
+    current_period_end: string | null;
+    created_at: string;
+  };
+}
+
+/**
  * Check if user has active subscription to a list
  */
 export async function hasActiveSubscription(

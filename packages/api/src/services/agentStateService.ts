@@ -40,11 +40,19 @@ export interface GetPropertiesOptions {
   stateFilter?: PropertyState | "all";
 }
 
+export interface StateCounts {
+  new: number;
+  contacted: number;
+  captured: number;
+  rejected: number;
+}
+
 export interface PaginatedProperties {
   data: PropertyWithAgentState[];
   cursor: string | null;
   hasMore: boolean;
   total: number;
+  stateCounts: StateCounts;
 }
 
 // ============================================
@@ -258,11 +266,43 @@ export async function getPropertiesWithAgentState(
   const nextCursor =
     hasMore && data.length > 0 ? data[data.length - 1].createdAt : null;
 
+  // Get counts by state (always unfiltered)
+  const stateCountsSql = `
+    SELECT 
+      COALESCE(pas.state, 'new') as state,
+      COUNT(*) as count
+    FROM properties p
+    LEFT JOIN property_agent_state pas 
+      ON pas.property_id = p.id AND pas.user_id = ?
+    WHERE p.list_id = ?
+    GROUP BY COALESCE(pas.state, 'new')
+  `;
+  const stateCountsResult = await db.execute({
+    sql: stateCountsSql,
+    args: [userId, listId],
+  });
+
+  const stateCounts: StateCounts = {
+    new: 0,
+    contacted: 0,
+    captured: 0,
+    rejected: 0,
+  };
+
+  for (const row of stateCountsResult.rows) {
+    const state = row.state as PropertyState;
+    const count = Number(row.count);
+    if (state in stateCounts) {
+      stateCounts[state] = count;
+    }
+  }
+
   return {
     data,
     cursor: nextCursor,
     hasMore,
     total,
+    stateCounts,
   };
 }
 

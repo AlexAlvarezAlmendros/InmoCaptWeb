@@ -267,6 +267,12 @@ export function ListDetailPage() {
   // Flatten all pages of properties
   const properties = data?.pages.flatMap((page) => page.data) ?? [];
   const totalProperties = data?.pages[0]?.total ?? 0;
+  const stateCounts = data?.pages[0]?.stateCounts ?? {
+    new: 0,
+    contacted: 0,
+    captured: 0,
+    rejected: 0,
+  };
 
   // Loading state
   if (isLoadingSubscription) {
@@ -371,9 +377,7 @@ export function ListDetailPage() {
       {/* Stats row */}
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {PROPERTY_STATES.map((state) => {
-          const count = properties.filter(
-            (p) => p.state === state.value,
-          ).length;
+          const count = stateCounts[state.value];
           return (
             <button
               key={state.value}

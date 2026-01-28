@@ -159,12 +159,6 @@ export function DashboardPage() {
                         : "Sin datos"}
                     </span>
                   </div>
-                  <div className="border-t border-border-light pt-3 dark:border-border-dark">
-                    <span className="text-xs text-slate-400">
-                      Renovación:{" "}
-                      {formatRelativeDate(subscription.currentPeriodEnd)}
-                    </span>
-                  </div>
                 </div>
               </CardContent>
             </Card>

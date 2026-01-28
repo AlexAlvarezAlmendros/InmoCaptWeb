@@ -6,6 +6,13 @@ import rateLimit from "@fastify/rate-limit";
 import { env } from "./config/env.js";
 import { registerRoutes } from "./routes/index.js";
 
+// Extend FastifyRequest to include rawBody
+declare module "fastify" {
+  interface FastifyRequest {
+    rawBody?: string;
+  }
+}
+
 const fastify = Fastify({
   logger: {
     level: env.LOG_LEVEL,
@@ -21,6 +28,22 @@ const fastify = Fastify({
         : undefined,
   },
 });
+
+// Add content type parser to capture raw body for webhooks
+fastify.addContentTypeParser(
+  "application/json",
+  { parseAs: "string" },
+  (req, body, done) => {
+    // Store raw body for webhook verification
+    req.rawBody = body as string;
+    try {
+      const json = JSON.parse(body as string);
+      done(null, json);
+    } catch (err) {
+      done(err as Error, undefined);
+    }
+  },
+);
 
 // Plugins
 await fastify.register(helmet);

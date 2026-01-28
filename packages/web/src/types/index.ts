@@ -170,12 +170,21 @@ export interface ApproveRequestInput {
   currency?: string;
 }
 
+// State counts for properties
+export interface StateCounts {
+  new: number;
+  contacted: number;
+  captured: number;
+  rejected: number;
+}
+
 // API response types
 export interface PaginatedResponse<T> {
   data: T[];
   cursor?: string;
   hasMore: boolean;
   total: number;
+  stateCounts?: StateCounts;
 }
 
 export interface ApiError {

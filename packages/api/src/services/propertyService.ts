@@ -477,7 +477,7 @@ export interface FotocasaRawProperty {
   descripcion?: string | null;
   anunciante?: string;
   fecha_scraping?: string;
-  telefono?: string; // "+34636517189" or "636517189"
+  telefono?: string | null; // "+34636517189" or "636517189" or null
 }
 
 export interface FotocasaUpload {
@@ -496,7 +496,7 @@ export function parseFotocasaProperty(raw: FotocasaRawProperty): PropertyInput {
     price: parseIdealistaPrice(raw.precio), // Same format "X.XXX €"
     m2: parseIdealistaM2(raw.metros),
     bedrooms: parseIdealistaBedrooms(raw.habitaciones), // Works for both "3 hab." and "3 habs"
-    phone: raw.telefono,
+    phone: raw.telefono ?? undefined,
     sourceUrl: raw.url,
     ownerName: raw.anunciante,
     // Store the full raw data for reference

@@ -186,7 +186,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
         return { message: "Subscription canceled successfully" };
       } catch (error) {
-        fastify.log.error("Failed to cancel subscription:", error);
+        fastify.log.error({ err: error }, "Failed to cancel subscription");
         return reply.code(500).send({ error: "Failed to cancel subscription" });
       }
     },

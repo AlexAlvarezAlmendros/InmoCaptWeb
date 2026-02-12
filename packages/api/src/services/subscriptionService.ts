@@ -110,7 +110,7 @@ export async function getSubscriptionByIdAndUser(
     return null;
   }
 
-  return result.rows[0] as {
+  return result.rows[0] as unknown as {
     id: string;
     user_id: string;
     list_id: string;

@@ -116,21 +116,20 @@ export async function billingRoutes(fastify: FastifyInstance) {
       try {
         // Create a portal configuration that cancels immediately
         // (business rule: cancellation = immediate loss of access)
-        const portalConfig =
-          await stripe.billingPortal.configurations.create({
-            business_profile: {
-              headline: "Gestiona tus suscripciones",
+        const portalConfig = await stripe.billingPortal.configurations.create({
+          business_profile: {
+            headline: "Gestiona tus suscripciones",
+          },
+          features: {
+            subscription_cancel: {
+              enabled: true,
+              mode: "immediately",
+              proration_behavior: "none",
             },
-            features: {
-              subscription_cancel: {
-                enabled: true,
-                mode: "immediately",
-                proration_behavior: "none",
-              },
-              payment_method_update: { enabled: true },
-              invoice_history: { enabled: true },
-            },
-          });
+            payment_method_update: { enabled: true },
+            invoice_history: { enabled: true },
+          },
+        });
 
         const session = await stripe.billingPortal.sessions.create({
           customer: stripeCustomerId,

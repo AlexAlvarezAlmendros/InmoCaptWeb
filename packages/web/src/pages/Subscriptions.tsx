@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Card,
@@ -52,6 +52,11 @@ export function SubscriptionsPage() {
   const [requestLocation, setRequestLocation] = useState("");
   const [requestNotes, setRequestNotes] = useState("");
   const [requestSuccess, setRequestSuccess] = useState(false);
+
+  // Search & pagination state for available lists
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
 
   const activeSubscriptions = subscriptions?.filter(
     (s) => s.status === "active",
@@ -129,6 +134,36 @@ export function SubscriptionsPage() {
     } catch (error) {
       console.error("Failed to create list request:", error);
     }
+  };
+
+  // Filter & paginate available lists
+  const filteredLists = useMemo(() => {
+    if (!availableLists) return [];
+    if (!searchQuery.trim()) return availableLists;
+    const q = searchQuery.toLowerCase().trim();
+    return availableLists.filter(
+      (list) =>
+        list.name.toLowerCase().includes(q) ||
+        list.location.toLowerCase().includes(q),
+    );
+  }, [availableLists, searchQuery]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredLists.length / ITEMS_PER_PAGE),
+  );
+  const paginatedLists = useMemo(
+    () =>
+      filteredLists.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE,
+      ),
+    [filteredLists, currentPage],
+  );
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
   };
 
   // Filter pending requests
@@ -302,9 +337,33 @@ export function SubscriptionsPage() {
 
       {/* Available Lists */}
       <section>
-        <h2 className="mb-4 text-xl font-bold text-slate-900 dark:text-white">
-          Listas Disponibles
-        </h2>
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            Listas Disponibles
+          </h2>
+          <div className="relative w-full sm:w-72">
+            <svg
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <Input
+              type="text"
+              placeholder="Buscar por nombre o ubicación..."
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </div>
 
         {isLoadingLists ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -338,59 +397,163 @@ export function SubscriptionsPage() {
               </div>
             </CardContent>
           </Card>
+        ) : filteredLists.length === 0 ? (
+          <Card>
+            <CardContent>
+              <div className="py-8 text-center">
+                <p className="text-slate-500">
+                  No se encontraron listas para "{searchQuery}".
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Prueba con otro término de búsqueda.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {availableLists.map((list) => (
-              <Card key={list.id}>
-                <CardHeader>
-                  <CardTitle>{list.name}</CardTitle>
-                  <p className="text-sm text-slate-500">{list.location}</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">Inmuebles</span>
-                      <span className="font-medium text-slate-900 dark:text-white">
-                        {list.totalProperties}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">Precio</span>
-                      <span className="font-semibold text-primary">
-                        {formatPrice(list.priceCents, list.currency)}/mes
-                      </span>
-                    </div>
-                    {list.lastUpdatedAt && (
+          <>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {paginatedLists.map((list) => (
+                <Card key={list.id}>
+                  <CardHeader>
+                    <CardTitle>{list.name}</CardTitle>
+                    <p className="text-sm text-slate-500">{list.location}</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-500">Actualizado</span>
-                        <span className="text-slate-400">
-                          {formatRelativeDate(list.lastUpdatedAt)}
+                        <span className="text-slate-500">Inmuebles</span>
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          {list.totalProperties}
                         </span>
                       </div>
-                    )}
-                    <Button
-                      variant="accent"
-                      className="mt-4 w-full"
-                      onClick={() => handleSubscribe(list.id)}
-                      disabled={
-                        subscribingListId === list.id ||
-                        createCheckoutSession.isPending
-                      }
-                    >
-                      {subscribingListId === list.id ? (
-                        <>
-                          <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          Procesando...
-                        </>
-                      ) : (
-                        "Suscribirse"
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-500">Precio</span>
+                        <span className="font-semibold text-primary">
+                          {formatPrice(list.priceCents, list.currency)}/mes
+                        </span>
+                      </div>
+                      {list.lastUpdatedAt && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500">Actualizado</span>
+                          <span className="text-slate-400">
+                            {formatRelativeDate(list.lastUpdatedAt)}
+                          </span>
+                        </div>
                       )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                      <Button
+                        variant="accent"
+                        className="mt-4 w-full"
+                        onClick={() => handleSubscribe(list.id)}
+                        disabled={
+                          subscribingListId === list.id ||
+                          createCheckoutSession.isPending
+                        }
+                      >
+                        {subscribingListId === list.id ? (
+                          <>
+                            <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            Procesando...
+                          </>
+                        ) : (
+                          "Suscribirse"
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-between">
+                <p className="text-sm text-slate-500">
+                  Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredLists.length)}{" "}
+                  de {filteredLists.length} listas
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((page) => {
+                      if (totalPages <= 7) return true;
+                      if (page === 1 || page === totalPages) return true;
+                      if (Math.abs(page - currentPage) <= 1) return true;
+                      return false;
+                    })
+                    .reduce<(number | "ellipsis")[]>((acc, page, idx, arr) => {
+                      if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
+                        acc.push("ellipsis");
+                      }
+                      acc.push(page);
+                      return acc;
+                    }, [])
+                    .map((item, idx) =>
+                      item === "ellipsis" ? (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-2 text-sm text-slate-400"
+                        >
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={item}
+                          onClick={() => setCurrentPage(item)}
+                          className={`min-w-[36px] rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                            currentPage === item
+                              ? "bg-primary text-white"
+                              : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      ),
+                    )}
+                  <button
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
 

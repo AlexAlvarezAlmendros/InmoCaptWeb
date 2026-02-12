@@ -85,8 +85,8 @@ export async function billingRoutes(fastify: FastifyInstance) {
               listId,
             },
           },
-          success_url: `${env.CORS_ORIGIN}/app/dashboard?checkout=success`,
-          cancel_url: `${env.CORS_ORIGIN}/app/subscriptions?checkout=cancelled`,
+          success_url: `${env.FRONTEND_URL}/app/dashboard?checkout=success`,
+          cancel_url: `${env.FRONTEND_URL}/app/subscriptions?checkout=cancelled`,
         });
 
         return { url: session.url };
@@ -116,7 +116,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
       try {
         const session = await stripe.billingPortal.sessions.create({
           customer: stripeCustomerId,
-          return_url: `${env.CORS_ORIGIN}/app/subscriptions`,
+          return_url: `${env.FRONTEND_URL}/app/subscriptions`,
         });
 
         return { url: session.url };

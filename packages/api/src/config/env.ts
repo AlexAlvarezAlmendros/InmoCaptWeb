@@ -13,6 +13,9 @@ const envSchema = z.object({
   // CORS
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
 
+  // Frontend URL (for Stripe redirects)
+  FRONTEND_URL: z.string().default("http://localhost:5173"),
+
   // Auth0
   AUTH0_DOMAIN: z.string(),
   AUTH0_AUDIENCE: z.string(),

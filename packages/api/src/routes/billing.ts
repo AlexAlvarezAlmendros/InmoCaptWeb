@@ -114,9 +114,28 @@ export async function billingRoutes(fastify: FastifyInstance) {
       }
 
       try {
+        // Create a portal configuration that cancels immediately
+        // (business rule: cancellation = immediate loss of access)
+        const portalConfig =
+          await stripe.billingPortal.configurations.create({
+            business_profile: {
+              headline: "Gestiona tus suscripciones",
+            },
+            features: {
+              subscription_cancel: {
+                enabled: true,
+                mode: "immediately",
+                proration_behavior: "none",
+              },
+              payment_method_update: { enabled: true },
+              invoice_history: { enabled: true },
+            },
+          });
+
         const session = await stripe.billingPortal.sessions.create({
           customer: stripeCustomerId,
-          return_url: `${env.FRONTEND_URL}/app/subscriptions`,
+          return_url: `${env.FRONTEND_URL}/app/subscriptions?portal=returned`,
+          configuration: portalConfig.id,
         });
 
         return { url: session.url };
@@ -269,14 +288,18 @@ export async function billingRoutes(fastify: FastifyInstance) {
             : null;
 
           // Map Stripe status to our status
+          // Business rule: cancellation = immediate loss of access
+          // When cancel_at_period_end is true (e.g. user canceled via Stripe portal),
+          // treat as canceled immediately.
           let status = "active";
-          if (subscription.status === "past_due") {
-            status = "past_due";
-          } else if (
+          if (
+            subscription.cancel_at_period_end ||
             subscription.status === "canceled" ||
             subscription.status === "unpaid"
           ) {
             status = "canceled";
+          } else if (subscription.status === "past_due") {
+            status = "past_due";
           }
 
           await updateSubscriptionByStripeId({
@@ -286,7 +309,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           });
 
           fastify.log.info(
-            `Subscription ${subscription.id} updated to status: ${status}`,
+            `Subscription ${subscription.id} updated to status: ${status} (cancel_at_period_end: ${subscription.cancel_at_period_end})`,
           );
           break;
         }

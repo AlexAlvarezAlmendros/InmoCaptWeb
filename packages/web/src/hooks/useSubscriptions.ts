@@ -17,6 +17,7 @@ export function useSubscriptions() {
       return response.data;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: "always", // Always refetch when user returns from Stripe portal
   });
 }
 

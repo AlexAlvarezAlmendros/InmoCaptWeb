@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Card,
   CardHeader,
@@ -22,8 +23,23 @@ import { useCreateListRequest, useListRequests } from "@/hooks/useListRequests";
 
 export function SubscriptionsPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const checkoutStatus = searchParams.get("checkout");
+  const portalReturned = searchParams.get("portal");
+
+  // Force refetch when returning from Stripe Portal
+  useEffect(() => {
+    if (portalReturned === "returned") {
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["availableLists"] });
+      // Clean the query param
+      setSearchParams((prev) => {
+        prev.delete("portal");
+        return prev;
+      });
+    }
+  }, [portalReturned, queryClient, setSearchParams]);
 
   const { data: subscriptions, isLoading: isLoadingSubscriptions } =
     useSubscriptions();

@@ -316,6 +316,42 @@ export async function deleteList(listId: string): Promise<boolean> {
     return false;
   }
 
+  // Manually cascade delete related records
+  // (PRAGMA foreign_keys may not be enabled in all environments)
+
+  // 1. Delete property_agent_state for properties in this list
+  await db.execute({
+    sql: `DELETE FROM property_agent_state WHERE property_id IN (
+      SELECT id FROM properties WHERE list_id = ?
+    )`,
+    args: [listId],
+  });
+
+  // 2. Delete properties
+  await db.execute({
+    sql: "DELETE FROM properties WHERE list_id = ?",
+    args: [listId],
+  });
+
+  // 3. Delete subscriptions
+  await db.execute({
+    sql: "DELETE FROM subscriptions WHERE list_id = ?",
+    args: [listId],
+  });
+
+  // 4. Delete list_updates
+  await db.execute({
+    sql: "DELETE FROM list_updates WHERE list_id = ?",
+    args: [listId],
+  });
+
+  // 5. Nullify list_requests references
+  await db.execute({
+    sql: "UPDATE list_requests SET created_list_id = NULL WHERE created_list_id = ?",
+    args: [listId],
+  });
+
+  // 6. Delete the list itself
   await db.execute({
     sql: "DELETE FROM lists WHERE id = ?",
     args: [listId],

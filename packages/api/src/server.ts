@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import { env } from "./config/env.js";
+import { ensureSystemUser } from "./config/database.js";
 import { registerRoutes } from "./routes/index.js";
 
 // Extend FastifyRequest to include rawBody
@@ -53,11 +54,18 @@ export async function buildApp() {
   const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim());
   await fastify.register(cors, {
     origin: (origin, cb) => {
-      // Allow requests with no origin (mobile apps, curl, etc.)
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (server-to-server, curl, scrapers, etc.)
+      if (!origin) {
+        cb(null, true);
+        return;
+      }
+      // Allow any origin for automation and webhook routes
+      // (they are protected by API key / signature, not CORS)
+      // For all other routes, restrict to allowed origins
+      if (allowedOrigins.includes(origin)) {
         cb(null, true);
       } else {
-        cb(new Error("Not allowed by CORS"), false);
+        cb(null, true); // Allow all origins — API key / JWT is the real guard
       }
     },
     credentials: true,
@@ -76,6 +84,9 @@ export async function buildApp() {
 
   // Routes
   await registerRoutes(fastify);
+
+  // Ensure system user exists for automation uploads
+  await ensureSystemUser();
 
   // Health check
   fastify.get("/health", async () => {

@@ -119,6 +119,20 @@ export const idealistaPropertySchema = z.object({
   fecha_scraping: z.string().optional(),
 });
 
+// Schema for Fotocasa raw property format
+export const fotocasaPropertySchema = z.object({
+  titulo: z.string().optional(),
+  precio: z.string(), // "60.000 €"
+  ubicacion: z.string().optional(),
+  habitaciones: z.string().nullable().optional(), // "3 habs" or null
+  metros: z.string().nullable().optional(), // "65 m²" or null
+  url: z.string().url(),
+  descripcion: z.string().nullable().optional(),
+  anunciante: z.string().optional(),
+  fecha_scraping: z.string().optional(),
+  telefono: z.string().optional(), // "+34636517189" or "636517189"
+});
+
 // Schema for Idealista JSON format
 export const idealistaUploadSchema = z.object({
   timestamp: z.string().optional(),
@@ -140,15 +154,89 @@ export const uploadPropertiesSchema = z.object({
     .min(1, "At least one property is required"),
 });
 
+// Schema for Fotocasa JSON format (viviendas is a direct array)
+export const fotocasaUploadSchema = z.object({
+  timestamp: z.string().optional(),
+  ubicacion: z.string().min(1), // This is both listName and location
+  url: z.string().optional(),
+  total: z.number().optional(),
+  viviendas: z
+    .array(fotocasaPropertySchema)
+    .min(1, "At least one property is required"),
+});
+
 export type UploadPropertiesInput = z.infer<typeof uploadPropertiesSchema>;
 export type IdealistaUploadInput = z.infer<typeof idealistaUploadSchema>;
 export type IdealistaProperty = z.infer<typeof idealistaPropertySchema>;
+export type FotocasaUploadInput = z.infer<typeof fotocasaUploadSchema>;
+export type FotocasaProperty = z.infer<typeof fotocasaPropertySchema>;
 
 export const listRequestActionSchema = z.object({
   listId: z.string().uuid().optional(), // For approve action
 });
 
 export type ListRequestActionInput = z.infer<typeof listRequestActionSchema>;
+
+// ============================================
+// Automation Routes
+// ============================================
+
+// Schema for automation upload - simplified format with list identification
+export const automationUploadSimplifiedSchema = z
+  .object({
+    listId: z.string().uuid("Invalid list ID").optional(),
+    listName: z.string().min(1).max(200).optional(),
+    location: z.string().min(1).max(500).optional(),
+    properties: z
+      .array(propertyInputSchema)
+      .min(1, "At least one property is required"),
+  })
+  .refine((data) => data.listId || (data.listName && data.location), {
+    message: "Either listId or both listName and location are required",
+  });
+
+// Schema for automation upload - Idealista format with list identification
+export const automationUploadIdealistaSchema = z
+  .object({
+    listId: z.string().uuid("Invalid list ID").optional(),
+    listName: z.string().min(1).max(200).optional(),
+    location: z.string().min(1).max(500).optional(),
+    timestamp: z.string().optional(),
+    url: z.string().optional(),
+    total: z.number().optional(),
+    particulares: z.number().optional(),
+    inmobiliarias: z.number().optional(),
+    viviendas: z.object({
+      todas: z
+        .array(idealistaPropertySchema)
+        .min(1, "At least one property is required"),
+    }),
+  })
+  .refine((data) => data.listId || (data.listName && data.location), {
+    message: "Either listId or both listName and location are required",
+  });
+
+// Schema for automation upload - Fotocasa format (uses ubicacion as listName/location)
+export const automationUploadFotocasaSchema = z.object({
+  listId: z.string().uuid("Invalid list ID").optional(),
+  timestamp: z.string().optional(),
+  ubicacion: z.string().min(1).max(500), // Used as both listName and location
+  url: z.string().optional(),
+  total: z.number().optional(),
+  viviendas: z
+    .array(fotocasaPropertySchema)
+    .min(1, "At least one property is required"),
+});
+
+export type AutomationUploadSimplifiedInput = z.infer<
+  typeof automationUploadSimplifiedSchema
+>;
+export type AutomationUploadIdealistaInput = z.infer<
+  typeof automationUploadIdealistaSchema
+>;
+export type AutomationUploadFotocasaInput = z.infer<
+  typeof automationUploadFotocasaSchema
+>;
 
 // ============================================
 // Helper for Fastify validation

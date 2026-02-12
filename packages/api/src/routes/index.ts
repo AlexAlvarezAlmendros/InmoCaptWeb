@@ -4,6 +4,7 @@ import { listsRoutes } from "./lists.js";
 import { billingRoutes } from "./billing.js";
 import { adminRoutes } from "./admin.js";
 import { listRequestsRoutes } from "./listRequests.js";
+import { automationRoutes } from "./automation.js";
 
 export async function registerRoutes(fastify: FastifyInstance) {
   // User routes
@@ -20,4 +21,7 @@ export async function registerRoutes(fastify: FastifyInstance) {
 
   // Admin routes
   await fastify.register(adminRoutes, { prefix: "/api/admin" });
+
+  // Automation routes (API key auth)
+  await fastify.register(automationRoutes, { prefix: "/api/automation" });
 }

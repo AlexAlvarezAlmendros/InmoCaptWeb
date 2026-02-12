@@ -127,3 +127,50 @@ export async function requireSubscription(
     return false;
   }
 }
+
+// API Key authentication middleware (for automation endpoints)
+export async function authenticateApiKey(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const apiKey = request.headers["x-api-key"] as string | undefined;
+
+  if (!env.API_AUTOMATION_KEY) {
+    request.log.error("API_AUTOMATION_KEY not configured");
+    reply.code(500).send({ error: "Automation endpoint not configured" });
+    return;
+  }
+
+  if (!apiKey) {
+    reply.code(401).send({ error: "Missing X-API-Key header" });
+    return;
+  }
+
+  // Constant-time comparison to prevent timing attacks
+  const expectedKey = env.API_AUTOMATION_KEY;
+  if (
+    apiKey.length !== expectedKey.length ||
+    !timingSafeEqual(apiKey, expectedKey)
+  ) {
+    reply.code(401).send({ error: "Invalid API key" });
+    return;
+  }
+
+  // Set a system user for audit purposes
+  request.user = {
+    sub: "system:automation",
+    email: "automation@system.local",
+    roles: ["admin"],
+    permissions: ["write:lists", "write:properties"],
+  };
+}
+
+// Constant-time string comparison
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}

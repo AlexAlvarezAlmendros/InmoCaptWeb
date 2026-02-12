@@ -24,6 +24,9 @@ const envSchema = z.object({
   // Stripe
   STRIPE_SECRET_KEY: z.string(),
   STRIPE_WEBHOOK_SECRET: z.string(),
+
+  // Automation
+  API_AUTOMATION_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

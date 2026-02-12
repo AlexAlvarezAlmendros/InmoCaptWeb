@@ -353,3 +353,68 @@ export async function getListSubscriberEmails(
 
   return result.rows.map((row) => row.email as string);
 }
+
+/**
+ * Find a list by name and location (case-insensitive)
+ */
+export async function findListByNameAndLocation(
+  name: string,
+  location: string,
+): Promise<List | null> {
+  const result = await db.execute({
+    sql: `
+      SELECT 
+        id,
+        name,
+        location,
+        price_cents as priceCents,
+        currency,
+        last_updated_at as lastUpdatedAt,
+        created_at as createdAt
+      FROM lists
+      WHERE LOWER(name) = LOWER(?) AND LOWER(location) = LOWER(?)
+      LIMIT 1
+    `,
+    args: [name, location],
+  });
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const row = result.rows[0];
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    location: row.location as string,
+    priceCents: row.priceCents as number,
+    currency: row.currency as string,
+    lastUpdatedAt: row.lastUpdatedAt as string,
+    createdAt: row.createdAt as string,
+  };
+}
+
+/**
+ * Find or create a list by name and location
+ */
+export async function findOrCreateList(
+  name: string,
+  location: string,
+  defaultPriceCents: number = 0,
+): Promise<{ list: List; created: boolean }> {
+  // Try to find existing list
+  const existing = await findListByNameAndLocation(name, location);
+  if (existing) {
+    return { list: existing, created: false };
+  }
+
+  // Create new list
+  const newList = await createList({
+    name,
+    location,
+    priceCents: defaultPriceCents,
+    currency: "EUR",
+  });
+
+  return { list: newList, created: true };
+}

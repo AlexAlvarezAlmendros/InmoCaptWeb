@@ -462,3 +462,69 @@ export function isIdealistaFormat(data: unknown): data is IdealistaUpload {
     Array.isArray((obj.viviendas as Record<string, unknown>).todas)
   );
 }
+
+// ============================================
+// Fotocasa Format Parsing
+// ============================================
+
+export interface FotocasaRawProperty {
+  titulo?: string;
+  precio: string; // "60.000 €"
+  ubicacion?: string;
+  habitaciones?: string | null; // "3 habs" or null
+  metros?: string | null; // "65 m²"
+  url: string;
+  descripcion?: string | null;
+  anunciante?: string;
+  fecha_scraping?: string;
+  telefono?: string; // "+34636517189" or "636517189"
+}
+
+export interface FotocasaUpload {
+  timestamp?: string;
+  ubicacion: string; // Used as listName and location
+  url?: string;
+  total?: number;
+  viviendas: FotocasaRawProperty[];
+}
+
+/**
+ * Convert Fotocasa raw property to internal PropertyInput format
+ */
+export function parseFotocasaProperty(raw: FotocasaRawProperty): PropertyInput {
+  return {
+    price: parseIdealistaPrice(raw.precio), // Same format "X.XXX €"
+    m2: parseIdealistaM2(raw.metros),
+    bedrooms: parseIdealistaBedrooms(raw.habitaciones), // Works for both "3 hab." and "3 habs"
+    phone: raw.telefono,
+    sourceUrl: raw.url,
+    ownerName: raw.anunciante,
+    // Store the full raw data for reference
+    rawPayload: {
+      titulo: raw.titulo,
+      ubicacion: raw.ubicacion,
+      descripcion: raw.descripcion,
+      fecha_scraping: raw.fecha_scraping,
+      precio_original: raw.precio,
+      habitaciones_original: raw.habitaciones,
+      metros_original: raw.metros,
+    },
+  };
+}
+
+/**
+ * Convert Fotocasa upload format to array of PropertyInput
+ */
+export function parseFotocasaUpload(data: FotocasaUpload): PropertyInput[] {
+  return data.viviendas.map(parseFotocasaProperty);
+}
+
+/**
+ * Detect if the JSON data is in Fotocasa format
+ * Fotocasa has: viviendas as direct array (not viviendas.todas) + ubicacion at root level
+ */
+export function isFotocasaFormat(data: unknown): data is FotocasaUpload {
+  if (typeof data !== "object" || data === null) return false;
+  const obj = data as Record<string, unknown>;
+  return typeof obj.ubicacion === "string" && Array.isArray(obj.viviendas);
+}

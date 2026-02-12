@@ -1,6 +1,9 @@
 import { db } from "../config/database.js";
 import { randomUUID } from "crypto";
-import { updateListTimestamp } from "./listService.js";
+import {
+  updateListTimestamp,
+  updateListPriceByPropertyCount,
+} from "./listService.js";
 
 // ============================================
 // Types
@@ -185,6 +188,9 @@ export async function uploadProperties(
 
   // Update list timestamp
   await updateListTimestamp(listId);
+
+  // Update list price based on total property count (2€ per property)
+  await updateListPriceByPropertyCount(listId);
 
   return {
     success: stats.errors === 0,

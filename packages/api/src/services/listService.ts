@@ -372,6 +372,27 @@ export async function updateListTimestamp(listId: string): Promise<void> {
 }
 
 /**
+ * Update list price based on property count (2€ per property)
+ */
+const PRICE_PER_PROPERTY_CENTS = 200; // 2€
+
+export async function updateListPriceByPropertyCount(
+  listId: string,
+): Promise<void> {
+  const result = await db.execute({
+    sql: "SELECT COUNT(*) as count FROM properties WHERE list_id = ?",
+    args: [listId],
+  });
+  const count = (result.rows[0]?.count as number) ?? 0;
+  const priceCents = count * PRICE_PER_PROPERTY_CENTS;
+
+  await db.execute({
+    sql: "UPDATE lists SET price_cents = ? WHERE id = ?",
+    args: [priceCents, listId],
+  });
+}
+
+/**
  * Get subscriber emails for a list (for notifications)
  */
 export async function getListSubscriberEmails(

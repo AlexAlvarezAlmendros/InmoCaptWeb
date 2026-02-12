@@ -47,9 +47,26 @@ fastify.addContentTypeParser(
 
 // Plugins
 await fastify.register(helmet);
+
+// CORS: support multiple origins separated by commas
+const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim());
 await fastify.register(cors, {
-  origin: env.CORS_ORIGIN,
+  origin: (origin, cb) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Not allowed by CORS"), false);
+    }
+  },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-API-Key",
+    "stripe-signature",
+  ],
 });
 await fastify.register(rateLimit, {
   max: 100,

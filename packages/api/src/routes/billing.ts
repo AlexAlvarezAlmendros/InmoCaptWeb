@@ -147,12 +147,10 @@ export async function billingRoutes(fastify: FastifyInstance) {
           stripeErr?.code === "resource_missing"
         ) {
           await updateStripeCustomerId(userId, null as unknown as string);
-          return reply
-            .code(400)
-            .send({
-              error:
-                "No billing account found. Please subscribe to a list first.",
-            });
+          return reply.code(400).send({
+            error:
+              "No billing account found. Please subscribe to a list first.",
+          });
         }
         throw err;
       }

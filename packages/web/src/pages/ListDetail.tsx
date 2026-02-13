@@ -222,6 +222,208 @@ function PropertyRow({
   );
 }
 
+// ─── Mobile Property Card ─────────────────────────────────────────
+function PropertyCard({
+  property,
+  onStateChange,
+  onCommentChange,
+}: {
+  property: Property;
+  onStateChange: (propertyId: string, state: PropertyState) => void;
+  onCommentChange: (propertyId: string, comment: string) => void;
+}) {
+  const [isEditingComment, setIsEditingComment] = useState(false);
+  const [commentValue, setCommentValue] = useState(property.comment || "");
+
+  const handleCommentSave = () => {
+    onCommentChange(property.id, commentValue);
+    setIsEditingComment(false);
+  };
+
+  const handleCommentCancel = () => {
+    setCommentValue(property.comment || "");
+    setIsEditingComment(false);
+  };
+
+  return (
+    <div className="rounded-lg border border-border-light bg-card-light p-3 dark:border-border-dark dark:bg-card-dark">
+      {/* Top row: title + state */}
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          {property.title && (
+            <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+              {property.title}
+            </p>
+          )}
+          {property.location && (
+            <p className="text-xs text-slate-500">{property.location}</p>
+          )}
+        </div>
+        <select
+          value={property.state}
+          onChange={(e) =>
+            onStateChange(property.id, e.target.value as PropertyState)
+          }
+          className={`shrink-0 rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
+            property.state === "new"
+              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+              : property.state === "contacted"
+                ? "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                : property.state === "captured"
+                  ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  : "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+          }`}
+        >
+          {PROPERTY_STATES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Price + details row */}
+      <div className="mb-2 flex items-center gap-3 text-sm">
+        <span className="font-semibold text-primary">
+          {formatPrice(property.price * 100, "EUR")}
+        </span>
+        {property.m2 && (
+          <span className="text-slate-500">{property.m2} m²</span>
+        )}
+        {property.bedrooms != null && (
+          <span className="text-slate-500">{property.bedrooms} hab.</span>
+        )}
+      </div>
+
+      {/* Contact row */}
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="text-slate-600 dark:text-slate-400">
+          {property.ownerName || "-"}
+        </span>
+        {property.phone ? (
+          <a
+            href={`tel:${property.phone}`}
+            className="text-primary hover:underline"
+          >
+            {property.phone}
+          </a>
+        ) : (
+          <span className="text-slate-400">-</span>
+        )}
+      </div>
+
+      {/* Source link */}
+      {property.sourceUrl && (
+        <div className="mb-2">
+          <a
+            href={property.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            Ver anuncio
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </a>
+        </div>
+      )}
+
+      {/* Comment row */}
+      <div className="border-t border-border-light pt-2 dark:border-border-dark">
+        {isEditingComment ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={commentValue}
+              onChange={(e) => setCommentValue(e.target.value)}
+              className="flex-1 rounded border border-primary bg-transparent px-2 py-1 text-sm focus:outline-none dark:bg-slate-800"
+              placeholder="Añadir comentario..."
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCommentSave();
+                if (e.key === "Escape") handleCommentCancel();
+              }}
+            />
+            <button
+              onClick={handleCommentSave}
+              className="text-green-600 hover:text-green-700"
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={handleCommentCancel}
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsEditingComment(true)}
+            className="flex w-full items-center gap-1.5 text-sm text-slate-500"
+          >
+            <svg
+              className="h-3.5 w-3.5 shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+              />
+            </svg>
+            <span className="truncate">
+              {property.comment || (
+                <span className="italic text-slate-400">
+                  Añadir comentario...
+                </span>
+              )}
+            </span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ListDetailPage() {
   const { listId } = useParams<{ listId: string }>();
   const navigate = useNavigate();
@@ -428,7 +630,8 @@ export function ListDetailPage() {
         </Card>
       ) : (
         <>
-          <div className="overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark">
+          {/* Desktop table */}
+          <div className="hidden overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark sm:block">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -471,6 +674,18 @@ export function ListDetailPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="space-y-3 sm:hidden">
+            {properties.map((property) => (
+              <PropertyCard
+                key={property.id}
+                property={property}
+                onStateChange={handleStateChange}
+                onCommentChange={handleCommentChange}
+              />
+            ))}
           </div>
 
           {/* Load more */}

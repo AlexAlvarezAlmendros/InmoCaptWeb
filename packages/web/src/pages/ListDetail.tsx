@@ -355,7 +355,9 @@ export function ListDetailPage() {
 
         {/* State filter */}
         <div className="flex items-center gap-2">
-          <span className="hidden text-sm text-slate-500 sm:block">Filtrar:</span>
+          <span className="hidden text-sm text-slate-500 sm:block">
+            Filtrar:
+          </span>
           <div className="flex flex-wrap gap-1 sm:gap-0 sm:rounded-lg sm:border sm:border-border-light sm:dark:border-border-dark">
             {STATE_FILTERS.map((filter) => (
               <button

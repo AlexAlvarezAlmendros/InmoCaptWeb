@@ -110,6 +110,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           },
           success_url: `${env.FRONTEND_URL}/app/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${env.FRONTEND_URL}/app/subscriptions?checkout=cancelled`,
+          allow_promotion_codes: true,
         });
 
         return { url: session.url };

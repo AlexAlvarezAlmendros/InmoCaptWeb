@@ -19,6 +19,14 @@ import {
   automationUploadFotocasaSchema,
   zodValidate,
 } from "../schemas/validation.js";
+import {
+  sendWelcomeEmail,
+  sendSubscriptionActivatedEmail,
+  sendSubscriptionCancelledEmail,
+  sendListUpdatedEmail,
+  sendListRequestApprovedEmail,
+  sendListRequestRejectedEmail,
+} from "../services/emailService.js";
 
 interface AutomationUploadBody {
   listId?: string;
@@ -262,6 +270,86 @@ export async function automationRoutes(fastify: FastifyInstance) {
     "/health",
     async (_request: FastifyRequest, _reply: FastifyReply) => {
       return { status: "ok", timestamp: new Date().toISOString() };
+    },
+  );
+
+  /**
+   * POST /automation/test-emails
+   *
+   * Send all email templates to a given email address for testing.
+   * Requires API key authentication.
+   *
+   * Body: { "email": "you@example.com" }
+   */
+  fastify.post(
+    "/test-emails",
+    { preHandler: [authenticateApiKey] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { email } = request.body as { email?: string };
+
+      if (!email) {
+        return reply.code(400).send({ error: "email is required in body" });
+      }
+
+      const results: Array<{ template: string; success: boolean }> = [];
+
+      // 1. Welcome
+      results.push({
+        template: "welcome",
+        success: await sendWelcomeEmail(email),
+      });
+
+      // 2. Subscription activated
+      results.push({
+        template: "subscription_activated",
+        success: await sendSubscriptionActivatedEmail(
+          email,
+          "Madrid Centro",
+          "test-list-123",
+        ),
+      });
+
+      // 3. Subscription cancelled
+      results.push({
+        template: "subscription_cancelled",
+        success: await sendSubscriptionCancelledEmail(email, "Madrid Centro"),
+      });
+
+      // 4. List updated
+      results.push({
+        template: "list_updated",
+        success: await sendListUpdatedEmail(
+          email,
+          "Barcelona Eixample",
+          15,
+          "test-list-456",
+        ),
+      });
+
+      // 5. List request approved
+      results.push({
+        template: "list_request_approved",
+        success: await sendListRequestApprovedEmail(
+          email,
+          "Tarragona Costa",
+          "Tarragona",
+        ),
+      });
+
+      // 6. List request rejected
+      results.push({
+        template: "list_request_rejected",
+        success: await sendListRequestRejectedEmail(email, "Lleida Capital"),
+      });
+
+      const sent = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+
+      return {
+        message: `${sent} emails sent, ${failed} failed`,
+        email,
+        results,
+      };
     },
   );
 }

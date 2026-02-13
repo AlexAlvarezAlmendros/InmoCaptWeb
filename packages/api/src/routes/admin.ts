@@ -7,7 +7,7 @@ import {
   updateList,
   deleteList,
 } from "../services/listService.js";
-import { ensureUserExists } from "../services/userService.js";
+import { ensureUserExists, getUserById } from "../services/userService.js";
 import {
   uploadProperties,
   isIdealistaFormat,
@@ -27,6 +27,12 @@ import {
   idealistaUploadSchema,
   zodValidate,
 } from "../schemas/validation.js";
+import { getListSubscribersWithNotifications } from "../services/subscriptionService.js";
+import {
+  notifyListSubscribers,
+  sendListRequestApprovedEmail,
+  sendListRequestRejectedEmail,
+} from "../services/emailService.js";
 
 export async function adminRoutes(fastify: FastifyInstance) {
   // ============================================
@@ -151,6 +157,27 @@ export async function adminRoutes(fastify: FastifyInstance) {
       // Upload properties (deduplication by URL happens inside)
       const result = await uploadProperties(listId, properties, authUser.sub);
 
+      // Notify subscribers if new properties were added
+      if (result.stats.new > 0) {
+        try {
+          const subscribers = await getListSubscribersWithNotifications(listId);
+          const emailResult = await notifyListSubscribers(
+            subscribers,
+            list.name,
+            result.stats.new,
+            listId,
+          );
+          fastify.log.info(
+            `List update notifications: ${emailResult.sent} sent, ${emailResult.failed} failed`,
+          );
+        } catch (emailErr) {
+          fastify.log.warn(
+            { err: emailErr },
+            "Failed to send list update notifications",
+          );
+        }
+      }
+
       return { data: result };
     },
   );
@@ -223,6 +250,23 @@ export async function adminRoutes(fastify: FastifyInstance) {
         currency: body.currency || "EUR",
       });
 
+      // Notify the requesting user
+      try {
+        const requestingUser = await getUserById(listRequest.user_id);
+        if (requestingUser?.email) {
+          await sendListRequestApprovedEmail(
+            requestingUser.email,
+            body.name,
+            listRequest.location,
+          );
+        }
+      } catch (emailErr) {
+        fastify.log.warn(
+          { err: emailErr },
+          "Failed to send list request approved email",
+        );
+      }
+
       return { data: result };
     },
   );
@@ -246,6 +290,23 @@ export async function adminRoutes(fastify: FastifyInstance) {
       }
 
       const result = await rejectListRequest(requestId);
+
+      // Notify the requesting user
+      try {
+        const requestingUser = await getUserById(listRequest.user_id);
+        if (requestingUser?.email) {
+          await sendListRequestRejectedEmail(
+            requestingUser.email,
+            listRequest.location,
+          );
+        }
+      } catch (emailErr) {
+        fastify.log.warn(
+          { err: emailErr },
+          "Failed to send list request rejected email",
+        );
+      }
+
       return { data: result };
     },
   );

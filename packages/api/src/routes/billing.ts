@@ -15,9 +15,14 @@ import {
   cancelSubscriptionByStripeId,
   getSubscriptionByIdAndUser,
   getCanceledSubscriptionsForCustomer,
+  getSubscriptionByStripeId,
 } from "../services/subscriptionService.js";
 import { zodValidate, checkoutSessionSchema } from "../schemas/validation.js";
 import { getListById } from "../services/listService.js";
+import {
+  sendSubscriptionActivatedEmail,
+  sendSubscriptionCancelledEmail,
+} from "../services/emailService.js";
 
 export async function billingRoutes(fastify: FastifyInstance) {
   // Create checkout session for subscribing to a list
@@ -451,6 +456,27 @@ export async function billingRoutes(fastify: FastifyInstance) {
             fastify.log.info(
               `Subscription created for user ${userId} to list ${listId}`,
             );
+
+            // Send subscription activated email
+            try {
+              const user = await ensureUserExists({
+                sub: userId,
+                email: session.customer_details?.email || "",
+              } as import("../plugins/auth.js").AuthUser);
+              const list = await getListById(listId);
+              if (user?.email && list) {
+                await sendSubscriptionActivatedEmail(
+                  user.email,
+                  list.name,
+                  listId,
+                );
+              }
+            } catch (emailErr) {
+              fastify.log.warn(
+                { err: emailErr },
+                "Failed to send subscription activated email",
+              );
+            }
           }
           break;
         }
@@ -557,7 +583,38 @@ export async function billingRoutes(fastify: FastifyInstance) {
         case "customer.subscription.deleted": {
           const subscription = event.data.object as Stripe.Subscription;
 
+          // Get subscription info before cancelling to send email
+          const subRecord = await getSubscriptionByStripeId(subscription.id);
+          let cancelledListName: string | null = null;
+          let cancelledUserEmail: string | null = null;
+
+          if (subRecord) {
+            const cancelledList = await getListById(
+              (subRecord as unknown as { list_id: string }).list_id,
+            );
+            cancelledListName = cancelledList?.name || null;
+            const cancelledUser = await getUserByStripeCustomerId(
+              subscription.customer as string,
+            );
+            cancelledUserEmail = cancelledUser?.email || null;
+          }
+
           await cancelSubscriptionByStripeId(subscription.id);
+
+          // Send cancellation email
+          if (cancelledUserEmail && cancelledListName) {
+            try {
+              await sendSubscriptionCancelledEmail(
+                cancelledUserEmail,
+                cancelledListName,
+              );
+            } catch (emailErr) {
+              fastify.log.warn(
+                { err: emailErr },
+                "Failed to send subscription cancelled email",
+              );
+            }
+          }
 
           fastify.log.info(`Subscription ${subscription.id} canceled`);
           break;

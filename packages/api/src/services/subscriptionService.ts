@@ -195,3 +195,27 @@ export async function getAllUserSubscriptions(userId: string) {
     created_at: string;
   }>;
 }
+
+/**
+ * Get emails of active subscribers for a list who have email notifications enabled.
+ * Used for sending list update notifications.
+ */
+export async function getListSubscribersWithNotifications(
+  listId: string,
+): Promise<Array<{ email: string; userId: string }>> {
+  const result = await db.execute({
+    sql: `
+      SELECT u.id as user_id, u.email
+      FROM subscriptions s
+      JOIN users u ON u.id = s.user_id
+      WHERE s.list_id = ?
+        AND s.status = 'active'
+        AND u.email_notifications_on = 1
+        AND u.email IS NOT NULL
+        AND u.email != ''
+    `,
+    args: [listId],
+  });
+
+  return result.rows as unknown as Array<{ email: string; userId: string }>;
+}

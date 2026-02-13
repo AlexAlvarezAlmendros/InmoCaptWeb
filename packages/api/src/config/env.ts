@@ -30,6 +30,10 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string(),
   STRIPE_WEBHOOK_SECRET: z.string(),
 
+  // Email (Resend)
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default("InmoCapt <onboarding@resend.dev>"),
+
   // Automation
   API_AUTOMATION_KEY: z.string().optional(),
 });

@@ -1,5 +1,6 @@
 import { db } from "../config/database.js";
 import type { AuthUser } from "../plugins/auth.js";
+import { sendWelcomeEmail } from "./emailService.js";
 
 export interface DbUser {
   id: string;
@@ -59,6 +60,13 @@ export async function ensureUserExists(authUser: AuthUser): Promise<DbUser> {
     `,
     args: [authUser.sub, authUser.email || "", now],
   });
+
+  // Send welcome email (fire-and-forget)
+  if (authUser.email) {
+    sendWelcomeEmail(authUser.email).catch((err) =>
+      console.warn("[Email] Failed to send welcome email:", err),
+    );
+  }
 
   return {
     id: authUser.sub,

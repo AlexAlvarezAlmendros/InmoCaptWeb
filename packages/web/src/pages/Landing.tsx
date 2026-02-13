@@ -141,8 +141,231 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials Section */}
+      {/* Notifications Section */}
       <section className="border-t border-border-light py-20 dark:border-border-dark">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid items-center gap-12 lg:grid-cols-2">
+            {/* Text */}
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-accent/10 px-3 py-1 text-sm font-medium text-accent">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
+                </svg>
+                Notificaciones automáticas
+              </div>
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-white">
+                No te pierdas ningún inmueble nuevo
+              </h2>
+              <p className="mt-4 text-lg text-slate-600 dark:text-slate-400">
+                Recibe alertas por email cada vez que se actualicen tus listas.
+                Sin tener que estar pendiente — te avisamos cuando hay
+                novedades.
+              </p>
+              <ul className="mt-8 space-y-4">
+                {[
+                  {
+                    title: "Nuevos inmuebles",
+                    description:
+                      "Recibe un email cuando se añadan nuevas propiedades a tus listas suscritas.",
+                    icon: (
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                        />
+                      </svg>
+                    ),
+                  },
+                  {
+                    title: "Confirmación de suscripciones",
+                    description:
+                      "Confirmación instantánea al activar o cancelar una suscripción.",
+                    icon: (
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    ),
+                  },
+                  {
+                    title: "Solicitudes de lista",
+                    description:
+                      "Te notificamos cuando tu solicitud de nueva lista sea aprobada y esté lista para usar.",
+                    icon: (
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                    ),
+                  },
+                  {
+                    title: "Control total",
+                    description:
+                      "Activa o desactiva las notificaciones desde tu cuenta en cualquier momento.",
+                    icon: (
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                    ),
+                  },
+                ].map((item, i) => (
+                  <li key={i} className="flex gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        {item.title}
+                      </p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        {item.description}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Email preview mockup */}
+            <div className="relative mx-auto w-full max-w-md lg:mx-0">
+              <div className="rounded-xl border border-border-light bg-card-light p-1 shadow-xl dark:border-border-dark dark:bg-card-dark">
+                {/* Email client header */}
+                <div className="flex items-center gap-2 border-b border-border-light px-4 py-3 dark:border-border-dark">
+                  <div className="flex gap-1.5">
+                    <div className="h-3 w-3 rounded-full bg-red-400" />
+                    <div className="h-3 w-3 rounded-full bg-yellow-400" />
+                    <div className="h-3 w-3 rounded-full bg-green-400" />
+                  </div>
+                  <span className="ml-2 text-xs text-slate-400">
+                    Bandeja de entrada
+                  </span>
+                </div>
+                {/* Email items */}
+                <div className="divide-y divide-border-light dark:divide-border-dark">
+                  {[
+                    {
+                      subject: "Barcelona Eixample — 12 nuevos inmuebles",
+                      preview:
+                        "La lista Barcelona Eixample tiene 12 nuevos inmuebles disponibles para ti.",
+                      time: "Hace 5 min",
+                      unread: true,
+                    },
+                    {
+                      subject: "¡Suscripción activada!",
+                      preview:
+                        "Tu suscripción a Madrid Centro está activa. Ya puedes acceder a todos los inmuebles.",
+                      time: "Hace 2h",
+                      unread: true,
+                    },
+                    {
+                      subject: "¡Bienvenido a InmoCapt!",
+                      preview:
+                        "Tu cuenta ha sido creada correctamente. Ya puedes suscribirte a listas.",
+                      time: "Ayer",
+                      unread: false,
+                    },
+                  ].map((email, i) => (
+                    <div
+                      key={i}
+                      className={`px-4 py-3 transition-colors ${
+                        email.unread ? "bg-primary/5 dark:bg-primary/10" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {email.unread && (
+                            <div className="h-2 w-2 rounded-full bg-primary" />
+                          )}
+                          <span
+                            className={`text-sm ${
+                              email.unread
+                                ? "font-semibold text-slate-900 dark:text-white"
+                                : "text-slate-600 dark:text-slate-400"
+                            }`}
+                          >
+                            InmoCapt
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-400">
+                          {email.time}
+                        </span>
+                      </div>
+                      <p
+                        className={`mt-1 text-sm ${
+                          email.unread
+                            ? "font-medium text-slate-800 dark:text-slate-200"
+                            : "text-slate-600 dark:text-slate-400"
+                        }`}
+                      >
+                        {email.subject}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-slate-400">
+                        {email.preview}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Decorative glow */}
+              <div className="absolute -inset-4 -z-10 rounded-2xl bg-gradient-to-br from-primary/20 via-accent/10 to-transparent blur-2xl" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="border-t border-border-light bg-white py-20 dark:border-border-dark dark:bg-card-dark">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-center text-3xl font-bold text-slate-900 dark:text-white">
             Lo que dicen nuestros usuarios

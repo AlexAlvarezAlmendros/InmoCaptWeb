@@ -355,17 +355,17 @@ export function ListDetailPage() {
 
         {/* State filter */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-500">Filtrar:</span>
-          <div className="flex rounded-lg border border-border-light dark:border-border-dark">
+          <span className="hidden text-sm text-slate-500 sm:block">Filtrar:</span>
+          <div className="flex flex-wrap gap-1 sm:gap-0 sm:rounded-lg sm:border sm:border-border-light sm:dark:border-border-dark">
             {STATE_FILTERS.map((filter) => (
               <button
                 key={filter.value}
                 onClick={() => setStateFilter(filter.value)}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors sm:rounded-none sm:first:rounded-l-lg sm:last:rounded-r-lg ${
                   stateFilter === filter.value
                     ? "bg-primary text-white"
-                    : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
-                }`}
+                    : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 sm:bg-white sm:dark:bg-slate-900"
+                } border border-border-light dark:border-border-dark sm:border-0`}
               >
                 {filter.label}
               </button>

@@ -247,21 +247,25 @@ export async function notifyListSubscribers(
     return { sent: 0, failed: 0 };
   }
 
-  const results = await Promise.allSettled(
-    subscribers.map((sub) =>
-      sendListUpdatedEmail(sub.email, listName, newPropertiesCount, listId),
-    ),
-  );
-
+  const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
   let sent = 0;
   let failed = 0;
 
-  for (const result of results) {
-    if (result.status === "fulfilled" && result.value) {
-      sent++;
-    } else {
+  for (const sub of subscribers) {
+    try {
+      const ok = await sendListUpdatedEmail(
+        sub.email,
+        listName,
+        newPropertiesCount,
+        listId,
+      );
+      if (ok) sent++;
+      else failed++;
+    } catch {
       failed++;
     }
+    // Resend rate limit: 2 req/s
+    await delay(600);
   }
 
   console.log(

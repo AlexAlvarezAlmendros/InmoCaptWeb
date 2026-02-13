@@ -292,12 +292,14 @@ export async function automationRoutes(fastify: FastifyInstance) {
       }
 
       const results: Array<{ template: string; success: boolean }> = [];
+      const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
       // 1. Welcome
       results.push({
         template: "welcome",
         success: await sendWelcomeEmail(email),
       });
+      await delay(600);
 
       // 2. Subscription activated
       results.push({
@@ -308,12 +310,14 @@ export async function automationRoutes(fastify: FastifyInstance) {
           "test-list-123",
         ),
       });
+      await delay(600);
 
       // 3. Subscription cancelled
       results.push({
         template: "subscription_cancelled",
         success: await sendSubscriptionCancelledEmail(email, "Madrid Centro"),
       });
+      await delay(600);
 
       // 4. List updated
       results.push({
@@ -325,6 +329,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
           "test-list-456",
         ),
       });
+      await delay(600);
 
       // 5. List request approved
       results.push({
@@ -335,6 +340,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
           "Tarragona",
         ),
       });
+      await delay(600);
 
       // 6. List request rejected
       results.push({

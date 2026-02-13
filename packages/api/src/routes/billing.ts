@@ -353,9 +353,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
           if (resolvedUserId && resolvedListId) {
             const periodEnd = subscription.current_period_end
-              ? new Date(
-                  subscription.current_period_end * 1000,
-                ).toISOString()
+              ? new Date(subscription.current_period_end * 1000).toISOString()
               : null;
 
             await createSubscription({

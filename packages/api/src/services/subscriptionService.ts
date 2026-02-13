@@ -52,11 +52,12 @@ export async function createSubscription(
 
 /**
  * Update subscription by Stripe subscription ID
+ * Returns number of rows affected
  */
 export async function updateSubscriptionByStripeId(
   params: UpdateSubscriptionParams,
-): Promise<void> {
-  await db.execute({
+): Promise<number> {
+  const result = await db.execute({
     sql: `
       UPDATE subscriptions 
       SET status = ?, current_period_end = ?
@@ -64,6 +65,8 @@ export async function updateSubscriptionByStripeId(
     `,
     args: [params.status, params.currentPeriodEnd, params.stripeSubscriptionId],
   });
+
+  return result.rowsAffected;
 }
 
 /**
@@ -125,6 +128,34 @@ export async function getSubscriptionByIdAndUser(
 /**
  * Check if user has active subscription to a list
  */
+/**
+ * Get canceled subscriptions for a Stripe customer (for resubscription matching)
+ */
+export async function getCanceledSubscriptionsForCustomer(
+  stripeCustomerId: string,
+) {
+  const result = await db.execute({
+    sql: `
+      SELECT * FROM subscriptions
+      WHERE stripe_customer_id = ?
+        AND status = 'canceled'
+      ORDER BY created_at DESC
+    `,
+    args: [stripeCustomerId],
+  });
+
+  return result.rows as unknown as Array<{
+    id: string;
+    user_id: string;
+    list_id: string;
+    stripe_subscription_id: string;
+    stripe_customer_id: string;
+    status: string;
+    current_period_end: string | null;
+    created_at: string;
+  }>;
+}
+
 export async function hasActiveSubscription(
   userId: string,
   listId: string,

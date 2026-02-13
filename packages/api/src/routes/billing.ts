@@ -7,12 +7,14 @@ import {
   getStripeCustomerId,
   updateStripeCustomerId,
   ensureUserExists,
+  getUserByStripeCustomerId,
 } from "../services/userService.js";
 import {
   createSubscription,
   updateSubscriptionByStripeId,
   cancelSubscriptionByStripeId,
   getSubscriptionByIdAndUser,
+  getCanceledSubscriptionsForCustomer,
 } from "../services/subscriptionService.js";
 import { zodValidate, checkoutSessionSchema } from "../schemas/validation.js";
 import { getListById } from "../services/listService.js";
@@ -66,6 +68,9 @@ export async function billingRoutes(fastify: FastifyInstance) {
                 product_data: {
                   name: `Suscripción: ${list.name}`,
                   description: `Acceso a listados FSBO en ${list.location}`,
+                  metadata: {
+                    listId,
+                  },
                 },
                 unit_amount: list.priceCents,
                 recurring: {
@@ -237,6 +242,60 @@ export async function billingRoutes(fastify: FastifyInstance) {
           .send({ error: "Webhook signature verification failed" });
       }
 
+      // Helper: resolve userId and listId from a Stripe subscription
+      // Checks metadata, then customer lookup, then product metadata, then canceled sub fallback
+      async function resolveSubscriptionOwnership(
+        subscription: Stripe.Subscription,
+      ): Promise<{ userId: string | null; listId: string | null }> {
+        const customerId = subscription.customer as string;
+        let userId = subscription.metadata?.userId || null;
+        let listId = subscription.metadata?.listId || null;
+
+        // If no userId in metadata, look up user by Stripe customer ID
+        if (!userId && customerId) {
+          const user = await getUserByStripeCustomerId(customerId);
+          if (user) {
+            userId = user.id;
+          }
+        }
+
+        // If no listId in metadata, try product metadata
+        if (!listId) {
+          try {
+            const item = subscription.items?.data?.[0];
+            if (item?.price?.product) {
+              const productId =
+                typeof item.price.product === "string"
+                  ? item.price.product
+                  : item.price.product.id;
+              const product = await stripe.products.retrieve(productId);
+              if (product.metadata?.listId) {
+                listId = product.metadata.listId;
+              }
+            }
+          } catch {
+            fastify.log.warn(
+              "Failed to retrieve product metadata for subscription",
+            );
+          }
+        }
+
+        // If still no listId, look for last canceled subscription for this customer
+        if (!listId && customerId) {
+          const canceledSubs =
+            await getCanceledSubscriptionsForCustomer(customerId);
+          if (canceledSubs.length > 0) {
+            listId = canceledSubs[0].list_id;
+            // Also fill userId if still missing
+            if (!userId) {
+              userId = canceledSubs[0].user_id;
+            }
+          }
+        }
+
+        return { userId, listId };
+      }
+
       // Handle the event
       switch (event.type) {
         case "checkout.session.completed": {
@@ -277,6 +336,49 @@ export async function billingRoutes(fastify: FastifyInstance) {
           break;
         }
 
+        case "customer.subscription.created": {
+          const subscription = event.data.object as Stripe.Subscription;
+
+          // Skip if this came from a checkout session (handled by checkout.session.completed)
+          if (subscription.metadata?.userId && subscription.metadata?.listId) {
+            fastify.log.info(
+              `subscription.created with metadata — will be handled by checkout.session.completed`,
+            );
+            break;
+          }
+
+          // This handles portal resubscriptions and other external subscription creation
+          const { userId: resolvedUserId, listId: resolvedListId } =
+            await resolveSubscriptionOwnership(subscription);
+
+          if (resolvedUserId && resolvedListId) {
+            const periodEnd = subscription.current_period_end
+              ? new Date(
+                  subscription.current_period_end * 1000,
+                ).toISOString()
+              : null;
+
+            await createSubscription({
+              userId: resolvedUserId,
+              listId: resolvedListId,
+              stripeSubscriptionId: subscription.id,
+              stripeCustomerId: subscription.customer as string,
+              status:
+                subscription.status === "active" ? "active" : "incomplete",
+              currentPeriodEnd: periodEnd,
+            });
+
+            fastify.log.info(
+              `Subscription created via portal resubscription: user=${resolvedUserId}, list=${resolvedListId}, stripeSubId=${subscription.id}`,
+            );
+          } else {
+            fastify.log.warn(
+              `Could not resolve ownership for subscription.created: subId=${subscription.id}, customerId=${subscription.customer}`,
+            );
+          }
+          break;
+        }
+
         case "customer.subscription.updated": {
           const subscription = event.data.object as Stripe.Subscription;
 
@@ -301,11 +403,33 @@ export async function billingRoutes(fastify: FastifyInstance) {
             status = "past_due";
           }
 
-          await updateSubscriptionByStripeId({
+          const rowsAffected = await updateSubscriptionByStripeId({
             stripeSubscriptionId: subscription.id,
             status,
             currentPeriodEnd: periodEnd,
           });
+
+          // If no rows were updated, the subscription might be new (e.g. portal resubscription)
+          // Try to create a record so the user regains access
+          if (rowsAffected === 0 && status === "active") {
+            const { userId: subUserId, listId: subListId } =
+              await resolveSubscriptionOwnership(subscription);
+
+            if (subUserId && subListId) {
+              await createSubscription({
+                userId: subUserId,
+                listId: subListId,
+                stripeSubscriptionId: subscription.id,
+                stripeCustomerId: subscription.customer as string,
+                status: "active",
+                currentPeriodEnd: periodEnd,
+              });
+
+              fastify.log.info(
+                `Subscription created via subscription.updated fallback: user=${subUserId}, list=${subListId}`,
+              );
+            }
+          }
 
           fastify.log.info(
             `Subscription ${subscription.id} updated to status: ${status} (cancel_at_period_end: ${subscription.cancel_at_period_end})`,

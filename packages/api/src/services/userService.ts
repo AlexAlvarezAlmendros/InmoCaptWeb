@@ -153,6 +153,24 @@ export async function getUserSubscriptions(
 }
 
 /**
+ * Get user by Stripe customer ID
+ */
+export async function getUserByStripeCustomerId(
+  stripeCustomerId: string,
+): Promise<DbUser | null> {
+  const result = await db.execute({
+    sql: "SELECT * FROM users WHERE stripe_customer_id = ?",
+    args: [stripeCustomerId],
+  });
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return result.rows[0] as unknown as DbUser;
+}
+
+/**
  * Get user's Stripe customer ID
  */
 export async function getStripeCustomerId(

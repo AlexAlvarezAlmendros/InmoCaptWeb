@@ -1,4 +1,5 @@
 import { useAuth0 } from "@auth0/auth0-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui";
 import { InteractiveDemo } from "@/components/landing/InteractiveDemo";
 
@@ -149,8 +150,8 @@ export function LandingPage() {
           <div className="mt-12 grid gap-8 md:grid-cols-3">
             {[
               {
-                name: "Carlos Rodríguez",
-                role: "Agente inmobiliario, Madrid",
+                name: "Jordi Puig",
+                role: "Agente inmobiliario, Igualada",
                 quote:
                   "He triplicado mis captaciones desde que uso InmoCapt. Los datos están siempre actualizados y el sistema de gestión es muy intuitivo.",
               },
@@ -161,8 +162,8 @@ export function LandingPage() {
                   "La mejor herramienta para encontrar propietarios particulares. Mi equipo no puede trabajar sin ella.",
               },
               {
-                name: "Miguel Ángel Torres",
-                role: "Agente independiente, Valencia",
+                name: "Marc Ferrer",
+                role: "Agente independiente, Tarragona",
                 quote:
                   "Excelente relación calidad-precio. El soporte es rápido y las actualizaciones constantes.",
               },
@@ -218,9 +219,40 @@ export function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border-light bg-card-light py-8 dark:border-border-dark dark:bg-card-dark">
-        <div className="mx-auto max-w-7xl px-4 text-center text-sm text-slate-500 sm:px-6 lg:px-8">
-          © {new Date().getFullYear()} InmoCapt. Todos los derechos reservados.
+      <footer className="border-t border-border-light bg-card-light py-10 dark:border-border-dark dark:bg-card-dark">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center gap-4">
+            <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-slate-500 dark:text-slate-400">
+              <Link
+                to="/legal/aviso-legal"
+                className="hover:text-primary transition-colors"
+              >
+                Aviso Legal
+              </Link>
+              <Link
+                to="/legal/privacidad"
+                className="hover:text-primary transition-colors"
+              >
+                Política de Privacidad
+              </Link>
+              <Link
+                to="/legal/cookies"
+                className="hover:text-primary transition-colors"
+              >
+                Política de Cookies
+              </Link>
+              <Link
+                to="/legal/terminos"
+                className="hover:text-primary transition-colors"
+              >
+                Términos y Condiciones
+              </Link>
+            </nav>
+            <p className="text-sm text-slate-400 dark:text-slate-500">
+              © {new Date().getFullYear()} InmoCapt. Todos los derechos
+              reservados.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

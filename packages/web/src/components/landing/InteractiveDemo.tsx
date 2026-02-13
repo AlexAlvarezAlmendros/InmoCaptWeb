@@ -1,52 +1,41 @@
 import { useState } from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Badge,
-  getStateLabel,
-} from "@/components/ui";
+import { Badge, getStateVariant } from "@/components/ui";
 import { formatPrice } from "@/lib/utils";
 import { PropertyState } from "@/types";
 
-// Demo data
+// ─── Demo Data ────────────────────────────────────────────────────
 const demoLists = [
   {
     id: "list-1",
     name: "Madrid Centro",
     location: "Madrid",
-    priceCents: 4900,
-    currency: "EUR",
-    lastUpdatedAt: "Hace 2 horas",
     totalProperties: 156,
     newProperties: 12,
+    lastUpdatedAt: "Hace 2 horas",
   },
   {
     id: "list-2",
     name: "Barcelona Eixample",
     location: "Barcelona",
-    priceCents: 4900,
-    currency: "EUR",
-    lastUpdatedAt: "Hace 1 día",
     totalProperties: 89,
     newProperties: 5,
+    lastUpdatedAt: "Hace 1 día",
   },
   {
     id: "list-3",
     name: "Valencia Ciutat Vella",
     location: "Valencia",
-    priceCents: 3900,
-    currency: "EUR",
-    lastUpdatedAt: "Hace 6 días",
     totalProperties: 45,
     newProperties: 0,
+    lastUpdatedAt: "Hace 6 días",
   },
 ];
 
 const demoProperties = [
   {
     id: "1",
+    title: "Piso en Calle Gran Vía",
+    location: "Centro, Madrid",
     price: 250000,
     m2: 85,
     bedrooms: 3,
@@ -57,6 +46,8 @@ const demoProperties = [
   },
   {
     id: "2",
+    title: "Ático en Malasaña",
+    location: "Malasaña, Madrid",
     price: 320000,
     m2: 110,
     bedrooms: 4,
@@ -67,6 +58,8 @@ const demoProperties = [
   },
   {
     id: "3",
+    title: "Estudio en Lavapiés",
+    location: "Lavapiés, Madrid",
     price: 180000,
     m2: 65,
     bedrooms: 2,
@@ -77,6 +70,8 @@ const demoProperties = [
   },
   {
     id: "4",
+    title: "Chalet en La Moraleja",
+    location: "La Moraleja, Madrid",
     price: 450000,
     m2: 150,
     bedrooms: 5,
@@ -87,6 +82,8 @@ const demoProperties = [
   },
   {
     id: "5",
+    title: "Piso en Salamanca",
+    location: "Barrio Salamanca, Madrid",
     price: 295000,
     m2: 95,
     bedrooms: 3,
@@ -97,16 +94,31 @@ const demoProperties = [
   },
 ];
 
+const PROPERTY_STATES: { value: PropertyState; label: string }[] = [
+  { value: "new", label: "Nuevo" },
+  { value: "contacted", label: "Contactado" },
+  { value: "captured", label: "Captado" },
+  { value: "rejected", label: "Rechazado" },
+];
+
+const STATE_FILTERS: { value: PropertyState | "all"; label: string }[] = [
+  { value: "all", label: "Todos" },
+  ...PROPERTY_STATES,
+];
+
 type DemoView = "dashboard" | "list";
 
+// ─── Main Component ───────────────────────────────────────────────
 export function InteractiveDemo() {
   const [view, setView] = useState<DemoView>("dashboard");
   const [selectedList, setSelectedList] = useState(demoLists[0]);
   const [properties, setProperties] = useState(demoProperties);
   const [editingComment, setEditingComment] = useState<string | null>(null);
+  const [stateFilter, setStateFilter] = useState<PropertyState | "all">("all");
 
   const handleListClick = (list: (typeof demoLists)[0]) => {
     setSelectedList(list);
+    setStateFilter("all");
     setView("list");
   };
 
@@ -122,121 +134,111 @@ export function InteractiveDemo() {
     );
   };
 
+  const filteredProperties =
+    stateFilter === "all"
+      ? properties
+      : properties.filter((p) => p.state === stateFilter);
+
+  const stateCounts = PROPERTY_STATES.reduce(
+    (acc, s) => {
+      acc[s.value] = properties.filter((p) => p.state === s.value).length;
+      return acc;
+    },
+    {} as Record<PropertyState, number>,
+  );
+
   return (
-    <div className="rounded-xl border border-border-light bg-card-light shadow-2xl dark:border-border-dark dark:bg-card-dark overflow-hidden">
-      {/* Demo Header */}
-      <div className="flex items-center gap-2 border-b border-border-light bg-slate-50 px-4 py-2 dark:border-border-dark dark:bg-slate-900/50">
+    <div className="overflow-hidden rounded-xl border border-border-light bg-card-light shadow-2xl dark:border-border-dark dark:bg-card-dark">
+      {/* ── Browser Chrome ─────────────────────────────────────── */}
+      <div className="flex items-center gap-2 border-b border-border-light bg-slate-100 px-4 py-2 dark:border-border-dark dark:bg-slate-900/60">
         <div className="flex gap-1.5">
-          <div className="h-3 w-3 rounded-full bg-red-400"></div>
-          <div className="h-3 w-3 rounded-full bg-yellow-400"></div>
-          <div className="h-3 w-3 rounded-full bg-green-400"></div>
+          <div className="h-3 w-3 rounded-full bg-red-400" />
+          <div className="h-3 w-3 rounded-full bg-yellow-400" />
+          <div className="h-3 w-3 rounded-full bg-green-400" />
         </div>
         <div className="flex-1 text-center">
-          <span className="text-xs text-slate-500">
-            app.inmocapt.com/
+          <div className="mx-auto inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1 text-xs text-slate-500 dark:bg-slate-800">
+            <svg
+              className="h-3 w-3 text-green-500"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+            https://www.inmocapt.com/
             {view === "dashboard" ? "dashboard" : `lists/${selectedList.id}`}
-          </span>
+          </div>
         </div>
-        <Badge variant="info" className="text-xs">
+        <Badge variant="info" className="text-[10px]">
           Demo interactiva
         </Badge>
       </div>
 
-      {/* Sidebar + Content */}
-      <div className="flex h-[500px]">
-        {/* Sidebar */}
-        <div className="w-48 border-r border-border-light bg-slate-50/50 p-3 dark:border-border-dark dark:bg-slate-900/30">
-          <div className="mb-4">
-            <span className="text-lg font-bold text-primary">InmoCapt</span>
+      {/* ── App Header (replica of AppLayout) ──────────────────── */}
+      <div className="border-b border-border-light bg-card-light/90 backdrop-blur-sm dark:border-border-dark dark:bg-card-dark/90">
+        <div className="flex h-11 items-center justify-between px-4">
+          <div className="flex items-center gap-5">
+            <span className="text-sm font-bold text-primary">InmoCapt</span>
+            <nav className="flex items-center gap-0.5">
+              <button
+                onClick={() => setView("dashboard")}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                  view === "dashboard"
+                    ? "bg-primary text-white"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                }`}
+              >
+                Dashboard
+              </button>
+              <span className="cursor-default rounded-lg px-2.5 py-1 text-xs font-medium text-slate-400 dark:text-slate-500">
+                Suscripciones
+              </span>
+              <span className="cursor-default rounded-lg px-2.5 py-1 text-xs font-medium text-slate-400 dark:text-slate-500">
+                Cuenta
+              </span>
+            </nav>
           </div>
-          <nav className="space-y-1">
-            <button
-              onClick={() => setView("dashboard")}
-              className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                view === "dashboard"
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-                />
-              </svg>
-              Mis Listas
-            </button>
-            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                />
-              </svg>
-              Suscripciones
-            </button>
-            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              Cuenta
-            </button>
-          </nav>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-xs text-slate-500 sm:inline">
+              agente@demo.com
+            </span>
+            <span className="cursor-default rounded-lg px-2 py-1 text-xs text-slate-400">
+              Cerrar sesión
+            </span>
+          </div>
         </div>
+      </div>
 
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto p-4">
-          {view === "dashboard" ? (
-            <DashboardView lists={demoLists} onListClick={handleListClick} />
-          ) : (
-            <ListView
-              list={selectedList}
-              properties={properties}
-              onBack={() => setView("dashboard")}
-              onStateChange={handleStateChange}
-              onCommentChange={handleCommentChange}
-              editingComment={editingComment}
-              setEditingComment={setEditingComment}
-            />
-          )}
-        </div>
+      {/* ── Main Content Area ──────────────────────────────────── */}
+      <div className="h-[480px] overflow-y-auto bg-surface-light p-5 dark:bg-surface-dark">
+        {view === "dashboard" ? (
+          <DemoDashboard lists={demoLists} onListClick={handleListClick} />
+        ) : (
+          <DemoListDetail
+            list={selectedList}
+            properties={filteredProperties}
+            totalCount={properties.length}
+            stateCounts={stateCounts}
+            stateFilter={stateFilter}
+            onFilterChange={setStateFilter}
+            onBack={() => setView("dashboard")}
+            onStateChange={handleStateChange}
+            onCommentChange={handleCommentChange}
+            editingComment={editingComment}
+            setEditingComment={setEditingComment}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-// Dashboard View Component
-function DashboardView({
+// ─── Dashboard View (matches pages/Dashboard.tsx) ─────────────────
+function DemoDashboard({
   lists,
   onListClick,
 }: {
@@ -245,70 +247,75 @@ function DashboardView({
 }) {
   return (
     <div>
-      <div className="mb-4">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+      <div className="mb-5">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
           Mis Listas
         </h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           Accede a tus listados FSBO suscritos
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {lists.map((list) => (
-          <Card
+          <button
             key={list.id}
-            className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
             onClick={() => onListClick(list)}
+            className="group rounded-xl border border-border-light bg-card-light p-4 text-left transition-all hover:border-primary hover:shadow-md dark:border-border-dark dark:bg-card-dark"
           >
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between">
-                <CardTitle className="text-sm">{list.name}</CardTitle>
-                <Badge variant="success" className="text-xs">
-                  Activa
-                </Badge>
+            {/* Header */}
+            <div className="mb-3 flex items-start justify-between">
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate font-semibold text-slate-900 dark:text-white">
+                  {list.name}
+                </h3>
+                <p className="text-xs text-slate-500">{list.location}</p>
               </div>
-              <p className="text-xs text-slate-500">{list.location}</p>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Inmuebles</span>
-                  <span className="font-medium">{list.totalProperties}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Nuevos</span>
-                  <span className="font-medium text-accent">
+              <Badge variant="success" className="ml-2 shrink-0">
+                Activa
+              </Badge>
+            </div>
+
+            {/* Stats — matches real Dashboard cards */}
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Inmuebles totales</span>
+                <span className="font-medium text-slate-900 dark:text-white">
+                  {list.totalProperties}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Nuevos</span>
+                {list.newProperties > 0 ? (
+                  <Badge variant="success" className="font-medium">
                     +{list.newProperties}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Actualizado</span>
-                  <span className="text-slate-600 dark:text-slate-400">
-                    {list.lastUpdatedAt}
-                  </span>
-                </div>
-                <div className="border-t border-border-light pt-1.5 dark:border-border-dark">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Precio/mes</span>
-                    <span className="font-semibold text-primary">
-                      {formatPrice(list.priceCents, list.currency)}
-                    </span>
-                  </div>
-                </div>
+                  </Badge>
+                ) : (
+                  <span className="text-slate-400">0</span>
+                )}
               </div>
-            </CardContent>
-          </Card>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Actualizado</span>
+                <span className="text-slate-600 dark:text-slate-400">
+                  {list.lastUpdatedAt}
+                </span>
+              </div>
+            </div>
+          </button>
         ))}
       </div>
     </div>
   );
 }
 
-// List View Component
-function ListView({
+// ─── List Detail View (matches pages/ListDetail.tsx) ──────────────
+function DemoListDetail({
   list,
   properties,
+  totalCount,
+  stateCounts,
+  stateFilter,
+  onFilterChange,
   onBack,
   onStateChange,
   onCommentChange,
@@ -317,53 +324,102 @@ function ListView({
 }: {
   list: (typeof demoLists)[0];
   properties: typeof demoProperties;
+  totalCount: number;
+  stateCounts: Record<PropertyState, number>;
+  stateFilter: PropertyState | "all";
+  onFilterChange: (f: PropertyState | "all") => void;
   onBack: () => void;
-  onStateChange: (propertyId: string, state: PropertyState) => void;
-  onCommentChange: (propertyId: string, comment: string) => void;
+  onStateChange: (id: string, state: PropertyState) => void;
+  onCommentChange: (id: string, comment: string) => void;
   editingComment: string | null;
   setEditingComment: (id: string | null) => void;
 }) {
-  const states: PropertyState[] = ["new", "contacted", "captured", "rejected"];
-
   return (
     <div>
-      <div className="mb-4 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border-light text-slate-500 hover:bg-slate-50 dark:border-border-dark dark:hover:bg-slate-800"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
+      {/* ── Header with back + filter (matches real) ─────────── */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+          <button
+            onClick={onBack}
+            className="mb-1 flex items-center gap-1 text-xs text-slate-500 hover:text-primary"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            Volver al dashboard
+          </button>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
             {list.name}
           </h2>
-          <p className="text-xs text-slate-600 dark:text-slate-400">
-            {list.totalProperties} inmuebles • Actualizado {list.lastUpdatedAt}
+          <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+            {list.location} • {totalCount} inmuebles
           </p>
+        </div>
+
+        {/* State filter pills */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">Filtrar:</span>
+          <div className="flex rounded-lg border border-border-light dark:border-border-dark">
+            {STATE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => onFilterChange(f.value)}
+                className={`px-2 py-1 text-xs font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
+                  stateFilter === f.value
+                    ? "bg-primary text-white"
+                    : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-lg border border-border-light dark:border-border-dark">
+      {/* ── Stats row (matches real) ─────────────────────────── */}
+      <div className="mb-4 grid grid-cols-4 gap-3">
+        {PROPERTY_STATES.map((state) => (
+          <button
+            key={state.value}
+            onClick={() => onFilterChange(state.value)}
+            className={`rounded-lg border p-2 text-center transition-colors ${
+              stateFilter === state.value
+                ? "border-primary bg-primary/5"
+                : "border-border-light hover:border-primary/50 dark:border-border-dark"
+            }`}
+          >
+            <Badge
+              variant={getStateVariant(state.value)}
+              className="mb-0.5 text-[10px]"
+            >
+              {state.label}
+            </Badge>
+            <p className="text-lg font-bold text-slate-900 dark:text-white">
+              {stateCounts[state.value]}
+            </p>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Properties Table (matches real) ──────────────────── */}
+      <div className="overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-border-light bg-slate-50 dark:border-border-dark dark:bg-slate-900/50">
                 <th className="px-3 py-2 text-left font-medium uppercase tracking-wider text-slate-500">
-                  Precio
+                  Inmueble
                 </th>
                 <th className="px-3 py-2 text-left font-medium uppercase tracking-wider text-slate-500">
                   M²
@@ -375,88 +431,201 @@ function ListView({
                   Teléfono
                 </th>
                 <th className="px-3 py-2 text-left font-medium uppercase tracking-wider text-slate-500">
+                  Propietario
+                </th>
+                <th className="px-3 py-2 text-left font-medium uppercase tracking-wider text-slate-500">
                   Estado
                 </th>
                 <th className="px-3 py-2 text-left font-medium uppercase tracking-wider text-slate-500">
                   Comentario
                 </th>
+                <th className="px-3 py-2 text-left font-medium uppercase tracking-wider text-slate-500">
+                  Enlace
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-light dark:divide-border-dark">
               {properties.map((property) => (
-                <tr
+                <DemoPropertyRow
                   key={property.id}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-900/30"
-                >
-                  <td className="whitespace-nowrap px-3 py-2 font-medium">
-                    {formatPrice(property.price * 100, "EUR")}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-400">
-                    {property.m2} m²
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-400">
-                    {property.bedrooms}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-primary">
-                    {property.phone}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2">
-                    <select
-                      value={property.state}
-                      onChange={(e) =>
-                        onStateChange(
-                          property.id,
-                          e.target.value as PropertyState,
-                        )
-                      }
-                      className="rounded border border-border-light bg-transparent px-1.5 py-0.5 text-xs dark:border-border-dark focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    >
-                      {states.map((state) => (
-                        <option key={state} value={state}>
-                          {getStateLabel(state)}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-3 py-2">
-                    {editingComment === property.id ? (
-                      <input
-                        type="text"
-                        value={property.comment}
-                        onChange={(e) =>
-                          onCommentChange(property.id, e.target.value)
-                        }
-                        onBlur={() => setEditingComment(null)}
-                        onKeyDown={(e) =>
-                          e.key === "Enter" && setEditingComment(null)
-                        }
-                        autoFocus
-                        className="w-full rounded border border-primary bg-transparent px-1.5 py-0.5 text-xs focus:outline-none"
-                        placeholder="Añadir comentario..."
-                      />
-                    ) : (
-                      <button
-                        onClick={() => setEditingComment(property.id)}
-                        className="w-full truncate text-left text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                      >
-                        {property.comment || (
-                          <span className="italic text-slate-400">
-                            Añadir nota...
-                          </span>
-                        )}
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                  property={property}
+                  isEditing={editingComment === property.id}
+                  onEdit={() => setEditingComment(property.id)}
+                  onStopEdit={() => setEditingComment(null)}
+                  onStateChange={onStateChange}
+                  onCommentChange={onCommentChange}
+                />
               ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      <p className="mt-3 text-center text-xs text-slate-400">
-        💡 Prueba a cambiar el estado o añadir comentarios a los inmuebles
+      {/* ── Footer (matches real) ────────────────────────────── */}
+      <p className="mt-3 text-center text-[11px] text-slate-400">
+        Mostrando {properties.length} de {totalCount} inmuebles
+        <span className="mx-2">•</span>
+        <span className="text-primary">
+          Prueba a cambiar estados y añadir comentarios
+        </span>
       </p>
     </div>
+  );
+}
+
+// ─── Property Row (matches real PropertyRow styling) ──────────────
+function DemoPropertyRow({
+  property,
+  isEditing,
+  onEdit,
+  onStopEdit,
+  onStateChange,
+  onCommentChange,
+}: {
+  property: (typeof demoProperties)[0];
+  isEditing: boolean;
+  onEdit: () => void;
+  onStopEdit: () => void;
+  onStateChange: (id: string, state: PropertyState) => void;
+  onCommentChange: (id: string, comment: string) => void;
+}) {
+  return (
+    <tr className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
+      {/* Inmueble */}
+      <td className="px-3 py-2">
+        <div className="max-w-[140px]">
+          <p className="truncate text-xs font-medium text-slate-900 dark:text-white">
+            {property.title}
+          </p>
+          <p className="font-semibold text-primary">
+            {formatPrice(property.price * 100, "EUR")}
+          </p>
+          <p className="truncate text-[10px] text-slate-500">
+            {property.location}
+          </p>
+        </div>
+      </td>
+      {/* M² */}
+      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-400">
+        {property.m2} m²
+      </td>
+      {/* Hab */}
+      <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-400">
+        {property.bedrooms}
+      </td>
+      {/* Teléfono */}
+      <td className="whitespace-nowrap px-3 py-2 text-primary">
+        {property.phone}
+      </td>
+      {/* Propietario */}
+      <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
+        {property.ownerName}
+      </td>
+      {/* Estado (colored select — matches real) */}
+      <td className="whitespace-nowrap px-3 py-2">
+        <select
+          value={property.state}
+          onChange={(e) =>
+            onStateChange(property.id, e.target.value as PropertyState)
+          }
+          className={`rounded-md border px-1.5 py-0.5 text-xs font-medium transition-colors ${
+            property.state === "new"
+              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+              : property.state === "contacted"
+                ? "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                : property.state === "captured"
+                  ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  : "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+          }`}
+        >
+          {PROPERTY_STATES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </td>
+      {/* Comentario (inline edit — matches real) */}
+      <td className="px-3 py-2">
+        {isEditing ? (
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={property.comment}
+              onChange={(e) => onCommentChange(property.id, e.target.value)}
+              onBlur={onStopEdit}
+              onKeyDown={(e) => e.key === "Enter" && onStopEdit()}
+              autoFocus
+              className="w-28 rounded border border-primary bg-transparent px-1.5 py-0.5 text-xs focus:outline-none dark:bg-slate-800"
+              placeholder="Comentario..."
+            />
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onStopEdit();
+              }}
+              className="text-green-600 hover:text-green-700"
+            >
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onEdit}
+            className="group flex max-w-[100px] items-center gap-1 text-slate-500 hover:text-primary"
+          >
+            <span className="truncate">
+              {property.comment || (
+                <span className="italic text-slate-400">Añadir nota...</span>
+              )}
+            </span>
+            <svg
+              className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+              />
+            </svg>
+          </button>
+        )}
+      </td>
+      {/* Enlace */}
+      <td className="whitespace-nowrap px-3 py-2">
+        <span className="inline-flex items-center gap-0.5 text-primary">
+          Ver
+          <svg
+            className="h-3 w-3"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+            />
+          </svg>
+        </span>
+      </td>
+    </tr>
   );
 }

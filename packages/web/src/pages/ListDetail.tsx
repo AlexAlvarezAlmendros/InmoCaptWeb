@@ -54,8 +54,8 @@ function PropertyRow({
 
   return (
     <tr className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
-      <td className="px-4 py-4">
-        <div className="max-w-xs">
+      <td className="px-3 py-3">
+        <div className="min-w-[120px]">
           {property.title && (
             <p className="truncate font-medium text-slate-900 dark:text-white">
               {property.title}
@@ -71,13 +71,13 @@ function PropertyRow({
           )}
         </div>
       </td>
-      <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-400">
+      <td className="whitespace-nowrap px-3 py-3 text-sm text-slate-600 dark:text-slate-400">
         {property.m2 ? `${property.m2} m²` : "-"}
       </td>
-      <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-400">
+      <td className="whitespace-nowrap px-3 py-3 text-sm text-slate-600 dark:text-slate-400">
         {property.bedrooms ?? "-"}
       </td>
-      <td className="whitespace-nowrap px-4 py-4">
+      <td className="whitespace-nowrap px-3 py-3 text-sm">
         {property.phone ? (
           <a
             href={`tel:${property.phone}`}
@@ -89,10 +89,10 @@ function PropertyRow({
           <span className="text-slate-400">-</span>
         )}
       </td>
-      <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-400">
+      <td className="px-3 py-3 text-sm text-slate-600 dark:text-slate-400">
         {property.ownerName || "-"}
       </td>
-      <td className="whitespace-nowrap px-4 py-4">
+      <td className="whitespace-nowrap px-3 py-3 text-sm">
         <select
           value={property.state}
           onChange={(e) =>
@@ -115,14 +115,14 @@ function PropertyRow({
           ))}
         </select>
       </td>
-      <td className="px-4 py-4">
+      <td className="px-3 py-3">
         {isEditingComment ? (
           <div className="flex items-center gap-2">
             <input
               type="text"
               value={commentValue}
               onChange={(e) => setCommentValue(e.target.value)}
-              className="w-40 rounded border border-border-light px-2 py-1 text-sm dark:border-border-dark dark:bg-slate-800"
+              className="w-36 rounded border border-border-light px-2 py-1 text-sm dark:border-border-dark dark:bg-slate-800"
               placeholder="Comentario..."
               autoFocus
               onKeyDown={(e) => {
@@ -174,7 +174,7 @@ function PropertyRow({
             onClick={() => setIsEditingComment(true)}
             className="group flex items-center gap-1 text-sm text-slate-500 hover:text-primary"
           >
-            <span className="max-w-[150px] truncate">
+            <span className="max-w-[120px] truncate">
               {property.comment || "Añadir comentario"}
             </span>
             <svg
@@ -193,7 +193,7 @@ function PropertyRow({
           </button>
         )}
       </td>
-      <td className="whitespace-nowrap px-4 py-4">
+      <td className="whitespace-nowrap px-3 py-3 text-sm">
         {property.sourceUrl && (
           <a
             href={property.sourceUrl}
@@ -431,29 +431,29 @@ export function ListDetailPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border-light bg-slate-50 dark:border-border-dark dark:bg-slate-900/50">
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       Inmueble
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       M²
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       Hab.
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       Teléfono
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       Propietario
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       Estado
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       Comentario
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Acciones
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Enlace
                     </th>
                   </tr>
                 </thead>

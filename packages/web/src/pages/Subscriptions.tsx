@@ -428,6 +428,95 @@ export function SubscriptionsPage() {
           </Card>
         ) : (
           <>
+            {/* Pagination Top */}
+            {totalPages > 1 && (
+              <div className="mb-6 flex items-center justify-between">
+                <p className="text-sm text-slate-500">
+                  Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+                  {Math.min(currentPage * ITEMS_PER_PAGE, filteredLists.length)}{" "}
+                  de {filteredLists.length} listas
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((page) => {
+                      if (totalPages <= 7) return true;
+                      if (page === 1 || page === totalPages) return true;
+                      if (Math.abs(page - currentPage) <= 1) return true;
+                      return false;
+                    })
+                    .reduce<(number | "ellipsis")[]>((acc, page, idx, arr) => {
+                      if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
+                        acc.push("ellipsis");
+                      }
+                      acc.push(page);
+                      return acc;
+                    }, [])
+                    .map((item, idx) =>
+                      item === "ellipsis" ? (
+                        <span
+                          key={`ellipsis-top-${idx}`}
+                          className="px-2 text-sm text-slate-400"
+                        >
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={item}
+                          onClick={() => setCurrentPage(item)}
+                          className={`min-w-[36px] rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                            currentPage === item
+                              ? "bg-primary text-white"
+                              : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      ),
+                    )}
+                  <button
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {paginatedLists.map((list) => (
                 <Card key={list.id}>

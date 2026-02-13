@@ -23,7 +23,7 @@ export function AppLayout() {
     <div className="min-h-screen bg-surface-light dark:bg-surface-dark">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border-light bg-card-light/80 backdrop-blur-sm dark:border-border-dark dark:bg-card-dark/80">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             {/* Logo */}
             <button
@@ -65,7 +65,7 @@ export function AppLayout() {
       </header>
 
       {/* Main content */}
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-screen-2xl px-4 py-8 sm:px-6 lg:px-8">
         <Outlet />
       </main>
     </div>

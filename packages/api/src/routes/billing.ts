@@ -48,6 +48,24 @@ export async function billingRoutes(fastify: FastifyInstance) {
         // Check if user already has a Stripe customer ID
         let customerId = await getStripeCustomerId(userId);
 
+        // Verify the customer still exists in Stripe (may have been from test mode)
+        if (customerId) {
+          try {
+            await stripe.customers.retrieve(customerId);
+          } catch (err: unknown) {
+            const stripeErr = err as { statusCode?: number; code?: string };
+            if (
+              stripeErr?.statusCode === 404 ||
+              stripeErr?.code === "resource_missing"
+            ) {
+              customerId = null;
+              await updateStripeCustomerId(userId, null as unknown as string);
+            } else {
+              throw err;
+            }
+          }
+        }
+
         // If not, create a new customer
         if (!customerId) {
           const customer = await stripe.customers.create({
@@ -90,7 +108,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
               listId,
             },
           },
-          success_url: `${env.FRONTEND_URL}/app/dashboard?checkout=success`,
+          success_url: `${env.FRONTEND_URL}/app/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${env.FRONTEND_URL}/app/subscriptions?checkout=cancelled`,
         });
 
@@ -112,10 +130,30 @@ export async function billingRoutes(fastify: FastifyInstance) {
       const userId = request.user.sub;
 
       // Get Stripe customer ID from database
-      const stripeCustomerId = await getStripeCustomerId(userId);
+      let stripeCustomerId = await getStripeCustomerId(userId);
 
       if (!stripeCustomerId) {
         return reply.code(400).send({ error: "No billing account found" });
+      }
+
+      // Verify the customer still exists in Stripe
+      try {
+        await stripe.customers.retrieve(stripeCustomerId);
+      } catch (err: unknown) {
+        const stripeErr = err as { statusCode?: number; code?: string };
+        if (
+          stripeErr?.statusCode === 404 ||
+          stripeErr?.code === "resource_missing"
+        ) {
+          await updateStripeCustomerId(userId, null as unknown as string);
+          return reply
+            .code(400)
+            .send({
+              error:
+                "No billing account found. Please subscribe to a list first.",
+            });
+        }
+        throw err;
       }
 
       try {
@@ -211,6 +249,88 @@ export async function billingRoutes(fastify: FastifyInstance) {
       } catch (error) {
         fastify.log.error({ err: error }, "Failed to cancel subscription");
         return reply.code(500).send({ error: "Failed to cancel subscription" });
+      }
+    },
+  );
+
+  // Verify a checkout session and create subscription if missing
+  // This is the fallback mechanism when the webhook doesn't fire
+  fastify.post(
+    "/verify-session",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const { sessionId } = request.body as { sessionId: string };
+      const userId = request.user.sub;
+
+      if (!sessionId) {
+        return reply.code(400).send({ error: "sessionId is required" });
+      }
+
+      try {
+        // Retrieve the checkout session from Stripe
+        const session = await stripe.checkout.sessions.retrieve(sessionId, {
+          expand: ["subscription"],
+        });
+
+        // Verify this session belongs to the requesting user
+        if (session.metadata?.userId !== userId) {
+          return reply
+            .code(403)
+            .send({ error: "Session does not belong to this user" });
+        }
+
+        // Only process completed sessions
+        if (session.status !== "complete") {
+          return reply
+            .code(400)
+            .send({ error: "Checkout session is not complete" });
+        }
+
+        const listId = session.metadata?.listId;
+        const stripeSubscription = session.subscription as Stripe.Subscription;
+        const customerId = session.customer as string;
+
+        if (!listId || !stripeSubscription) {
+          return reply
+            .code(400)
+            .send({ error: "Session missing required data" });
+        }
+
+        const subscriptionId =
+          typeof stripeSubscription === "string"
+            ? stripeSubscription
+            : stripeSubscription.id;
+
+        // Retrieve full subscription to get period end
+        const fullSub =
+          typeof stripeSubscription === "string"
+            ? await stripe.subscriptions.retrieve(stripeSubscription)
+            : stripeSubscription;
+
+        const periodEnd = fullSub.current_period_end
+          ? new Date(fullSub.current_period_end * 1000).toISOString()
+          : null;
+
+        // Create subscription (idempotent — ON CONFLICT updates)
+        await createSubscription({
+          userId,
+          listId,
+          stripeSubscriptionId: subscriptionId,
+          stripeCustomerId: customerId,
+          status: "active",
+          currentPeriodEnd: periodEnd,
+        });
+
+        fastify.log.info(
+          `Subscription verified/created via verify-session: user=${userId}, list=${listId}`,
+        );
+
+        return { success: true, listId };
+      } catch (error) {
+        fastify.log.error({ err: error }, "Failed to verify checkout session");
+        return reply
+          .code(500)
+          .send({ error: "Failed to verify checkout session" });
       }
     },
   );

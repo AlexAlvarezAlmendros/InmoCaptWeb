@@ -6,12 +6,35 @@ import {
   Badge,
 } from "@/components/ui";
 import { formatRelativeDate } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSubscriptions } from "@/hooks/useSubscriptions";
+import { useVerifyCheckoutSession } from "@/hooks/useBilling";
+import { useEffect, useRef } from "react";
 
 export function DashboardPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: subscriptions, isLoading, error } = useSubscriptions();
+  const verifySession = useVerifyCheckoutSession();
+  const verifiedRef = useRef(false);
+
+  // When returning from Stripe checkout, verify the session to ensure
+  // the subscription is recorded in the DB (fallback if webhook failed)
+  useEffect(() => {
+    const sessionId = searchParams.get("session_id");
+    if (sessionId && !verifiedRef.current) {
+      verifiedRef.current = true;
+      verifySession.mutate(
+        { sessionId },
+        {
+          onSettled: () => {
+            // Clean up URL params regardless of success/failure
+            setSearchParams({}, { replace: true });
+          },
+        },
+      );
+    }
+  }, [searchParams, setSearchParams, verifySession]);
 
   if (isLoading) {
     return (

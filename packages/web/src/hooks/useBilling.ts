@@ -100,3 +100,22 @@ export function useCancelSubscription() {
     },
   });
 }
+
+export function useVerifyCheckoutSession() {
+  const apiClient = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ sessionId }: { sessionId: string }) => {
+      const response = await apiClient.post<{
+        success: boolean;
+        listId: string;
+      }>("/billing/verify-session", { sessionId });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["availableLists"] });
+    },
+  });
+}

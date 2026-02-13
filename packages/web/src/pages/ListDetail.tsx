@@ -55,17 +55,17 @@ function PropertyRow({
   return (
     <tr className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
       <td className="px-3 py-3">
-        <div className="min-w-[120px]">
+        <div className="max-w-[180px]">
           {property.title && (
-            <p className="truncate font-medium text-slate-900 dark:text-white">
+            <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
               {property.title}
             </p>
           )}
-          <p className="text-lg font-semibold text-primary">
+          <p className="font-semibold text-primary">
             {formatPrice(property.price * 100, "EUR")}
           </p>
           {property.location && (
-            <p className="truncate text-sm text-slate-500">
+            <p className="truncate text-xs text-slate-500">
               {property.location}
             </p>
           )}

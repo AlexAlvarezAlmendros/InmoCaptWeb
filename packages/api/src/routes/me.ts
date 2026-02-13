@@ -5,6 +5,8 @@ import {
   getUserSubscriptions,
   updateUserPreferences,
 } from "../services/userService.js";
+import { updateSubscriptionByStripeId } from "../services/subscriptionService.js";
+import { stripe } from "../config/stripe.js";
 import { zodValidate, updatePreferencesSchema } from "../schemas/validation.js";
 
 export async function meRoutes(fastify: FastifyInstance) {
@@ -31,21 +33,55 @@ export async function meRoutes(fastify: FastifyInstance) {
 
       const subscriptions = await getUserSubscriptions(request.user.sub);
 
-      return {
-        data: subscriptions.map((sub) => ({
-          id: sub.id,
-          listId: sub.list_id,
-          listName: sub.list_name,
-          listLocation: sub.list_location,
-          status: sub.status,
-          currentPeriodEnd: sub.current_period_end,
-          priceCents: sub.price_cents,
-          currency: sub.currency,
-          lastUpdatedAt: sub.last_updated_at,
-          totalProperties: sub.total_properties,
-          newPropertiesCount: sub.new_properties_count,
-        })),
-      };
+      // Enrich subscriptions missing current_period_end from Stripe
+      const enriched = await Promise.all(
+        subscriptions.map(async (sub) => {
+          let periodEnd = sub.current_period_end;
+
+          if (
+            !periodEnd &&
+            sub.status === "active" &&
+            sub.stripe_subscription_id
+          ) {
+            try {
+              const stripeSub = await stripe.subscriptions.retrieve(
+                sub.stripe_subscription_id,
+              );
+              if (stripeSub.current_period_end) {
+                periodEnd = new Date(
+                  stripeSub.current_period_end * 1000,
+                ).toISOString();
+                // Backfill DB so future requests don't need the Stripe call
+                await updateSubscriptionByStripeId({
+                  stripeSubscriptionId: sub.stripe_subscription_id,
+                  status: sub.status,
+                  currentPeriodEnd: periodEnd,
+                });
+              }
+            } catch (err) {
+              fastify.log.warn(
+                `Failed to fetch period end from Stripe for ${sub.stripe_subscription_id}`,
+              );
+            }
+          }
+
+          return {
+            id: sub.id,
+            listId: sub.list_id,
+            listName: sub.list_name,
+            listLocation: sub.list_location,
+            status: sub.status,
+            currentPeriodEnd: periodEnd,
+            priceCents: sub.price_cents,
+            currency: sub.currency,
+            lastUpdatedAt: sub.last_updated_at,
+            totalProperties: sub.total_properties,
+            newPropertiesCount: sub.new_properties_count,
+          };
+        }),
+      );
+
+      return { data: enriched };
     },
   );
 

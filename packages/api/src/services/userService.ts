@@ -16,6 +16,7 @@ export interface UserSubscription {
   list_location: string;
   status: string;
   current_period_end: string | null;
+  stripe_subscription_id: string | null;
   price_cents: number;
   currency: string;
   last_updated_at: string;
@@ -127,6 +128,7 @@ export async function getUserSubscriptions(
         l.location as list_location,
         s.status,
         s.current_period_end,
+        s.stripe_subscription_id,
         l.price_cents,
         l.currency,
         l.last_updated_at,

@@ -187,3 +187,34 @@ export async function getStripeCustomerId(
 
   return (result.rows[0] as unknown as DbUser).stripe_customer_id;
 }
+
+/**
+ * Delete a user and all their related data from the database.
+ * Tables with ON DELETE CASCADE (subscriptions, property_agent_state, list_requests)
+ * will be cleaned up automatically, but we delete explicitly for clarity.
+ */
+export async function deleteUser(userId: string): Promise<void> {
+  // Delete property agent states
+  await db.execute({
+    sql: "DELETE FROM property_agent_state WHERE user_id = ?",
+    args: [userId],
+  });
+
+  // Delete list requests
+  await db.execute({
+    sql: "DELETE FROM list_requests WHERE user_id = ?",
+    args: [userId],
+  });
+
+  // Delete subscriptions
+  await db.execute({
+    sql: "DELETE FROM subscriptions WHERE user_id = ?",
+    args: [userId],
+  });
+
+  // Delete the user
+  await db.execute({
+    sql: "DELETE FROM users WHERE id = ?",
+    args: [userId],
+  });
+}

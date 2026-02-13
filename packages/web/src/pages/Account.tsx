@@ -8,7 +8,11 @@ import {
   Button,
   Modal,
 } from "@/components/ui";
-import { useUserProfile, useUpdatePreferences } from "@/hooks/useUserProfile";
+import {
+  useUserProfile,
+  useUpdatePreferences,
+  useDeleteAccount,
+} from "@/hooks/useUserProfile";
 import { useCreatePortalSession } from "@/hooks/useBilling";
 import { formatDate } from "@/lib/utils";
 
@@ -23,6 +27,8 @@ export function AccountPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [passwordResetSent, setPasswordResetSent] = useState(false);
   const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+  const deleteAccount = useDeleteAccount();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Detect if user logged in via social provider (Google, etc.)
   // Auth0 sub format: "google-oauth2|123..." for Google, "auth0|123..." for email/password
@@ -386,6 +392,11 @@ export function AccountPage() {
           <p className="font-medium text-red-600 dark:text-red-400">
             Esta acción no se puede deshacer.
           </p>
+          {deleteError && (
+            <p className="text-sm text-red-600 dark:text-red-400">
+              {deleteError}
+            </p>
+          )}
           <div className="flex justify-end gap-3 pt-2">
             <Button
               variant="secondary"
@@ -395,13 +406,24 @@ export function AccountPage() {
             </Button>
             <Button
               variant="danger"
-              onClick={() => {
-                // TODO: Implement account deletion
-                alert("Funcionalidad próximamente disponible");
-                setShowDeleteModal(false);
+              disabled={deleteAccount.isPending}
+              onClick={async () => {
+                setDeleteError(null);
+                try {
+                  await deleteAccount.mutateAsync();
+                  logout({
+                    logoutParams: { returnTo: window.location.origin },
+                  });
+                } catch {
+                  setDeleteError(
+                    "Error al eliminar la cuenta. Inténtalo de nuevo.",
+                  );
+                }
               }}
             >
-              Sí, eliminar mi cuenta
+              {deleteAccount.isPending
+                ? "Eliminando..."
+                : "Sí, eliminar mi cuenta"}
             </Button>
           </div>
         </div>

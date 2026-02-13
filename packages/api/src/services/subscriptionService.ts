@@ -174,3 +174,24 @@ export async function hasActiveSubscription(
 
   return result.rows.length > 0;
 }
+
+/**
+ * Get all subscriptions for a user (any status) — used for account deletion
+ */
+export async function getAllUserSubscriptions(userId: string) {
+  const result = await db.execute({
+    sql: "SELECT * FROM subscriptions WHERE user_id = ?",
+    args: [userId],
+  });
+
+  return result.rows as unknown as Array<{
+    id: string;
+    user_id: string;
+    list_id: string;
+    stripe_subscription_id: string;
+    stripe_customer_id: string;
+    status: string;
+    current_period_end: string | null;
+    created_at: string;
+  }>;
+}

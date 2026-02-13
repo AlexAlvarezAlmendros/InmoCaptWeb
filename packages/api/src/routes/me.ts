@@ -4,9 +4,15 @@ import {
   ensureUserExists,
   getUserSubscriptions,
   updateUserPreferences,
+  getUserById,
+  deleteUser,
 } from "../services/userService.js";
-import { updateSubscriptionByStripeId } from "../services/subscriptionService.js";
+import {
+  updateSubscriptionByStripeId,
+  getAllUserSubscriptions,
+} from "../services/subscriptionService.js";
 import { stripe } from "../config/stripe.js";
+import { env } from "../config/env.js";
 import { zodValidate, updatePreferencesSchema } from "../schemas/validation.js";
 
 export async function meRoutes(fastify: FastifyInstance) {
@@ -104,6 +110,105 @@ export async function meRoutes(fastify: FastifyInstance) {
         message: "Preferences updated",
         data: result.data,
       };
+    },
+  );
+
+  // Delete user account
+  fastify.delete(
+    "/",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const userId = request.user.sub;
+
+      try {
+        // 1. Cancel all active Stripe subscriptions
+        const allSubs = await getAllUserSubscriptions(userId);
+        const activeSubs = allSubs.filter(
+          (s) =>
+            s.status === "active" &&
+            s.stripe_subscription_id?.startsWith("sub_"),
+        );
+
+        for (const sub of activeSubs) {
+          try {
+            await stripe.subscriptions.cancel(sub.stripe_subscription_id);
+            fastify.log.info(
+              `Canceled Stripe subscription ${sub.stripe_subscription_id} for account deletion`,
+            );
+          } catch (err) {
+            // Subscription may already be canceled in Stripe — continue
+            fastify.log.warn(
+              `Failed to cancel Stripe sub ${sub.stripe_subscription_id} during account deletion`,
+            );
+          }
+        }
+
+        // 2. Delete all user data from database
+        await deleteUser(userId);
+        fastify.log.info(`Deleted DB data for user ${userId}`);
+
+        // 3. Delete Auth0 user (if M2M credentials are configured)
+        if (env.AUTH0_M2M_CLIENT_ID && env.AUTH0_M2M_CLIENT_SECRET) {
+          try {
+            // Get Management API token
+            const tokenRes = await fetch(
+              `https://${env.AUTH0_DOMAIN}/oauth/token`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  grant_type: "client_credentials",
+                  client_id: env.AUTH0_M2M_CLIENT_ID,
+                  client_secret: env.AUTH0_M2M_CLIENT_SECRET,
+                  audience: `https://${env.AUTH0_DOMAIN}/api/v2/`,
+                }),
+              },
+            );
+
+            if (tokenRes.ok) {
+              const { access_token } = (await tokenRes.json()) as {
+                access_token: string;
+              };
+
+              // Delete user from Auth0
+              const deleteRes = await fetch(
+                `https://${env.AUTH0_DOMAIN}/api/v2/users/${encodeURIComponent(userId)}`,
+                {
+                  method: "DELETE",
+                  headers: { Authorization: `Bearer ${access_token}` },
+                },
+              );
+
+              if (deleteRes.ok || deleteRes.status === 204) {
+                fastify.log.info(`Deleted Auth0 user ${userId}`);
+              } else {
+                const errBody = await deleteRes.text();
+                fastify.log.warn(
+                  `Failed to delete Auth0 user: ${deleteRes.status} ${errBody}`,
+                );
+              }
+            } else {
+              fastify.log.warn(
+                "Failed to get Auth0 Management API token for account deletion",
+              );
+            }
+          } catch (err) {
+            fastify.log.error(
+              { err },
+              "Error deleting Auth0 user during account deletion",
+            );
+          }
+        } else {
+          fastify.log.info(
+            "Auth0 M2M credentials not configured — skipping Auth0 user deletion",
+          );
+        }
+
+        return { message: "Account deleted successfully" };
+      } catch (error) {
+        fastify.log.error({ err: error }, "Failed to delete account");
+        return reply.code(500).send({ error: "Failed to delete account" });
+      }
     },
   );
 }

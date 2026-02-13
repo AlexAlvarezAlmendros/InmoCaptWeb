@@ -19,6 +19,8 @@ const envSchema = z.object({
   // Auth0
   AUTH0_DOMAIN: z.string(),
   AUTH0_AUDIENCE: z.string(),
+  AUTH0_M2M_CLIENT_ID: z.string().optional(),
+  AUTH0_M2M_CLIENT_SECRET: z.string().optional(),
 
   // Database (Turso)
   DATABASE_URL: z.string(),

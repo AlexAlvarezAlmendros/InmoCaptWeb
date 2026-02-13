@@ -42,3 +42,14 @@ export function useUpdatePreferences() {
     },
   });
 }
+
+export function useDeleteAccount() {
+  const apiClient = useApiClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.delete<{ message: string }>("/me");
+      return response;
+    },
+  });
+}

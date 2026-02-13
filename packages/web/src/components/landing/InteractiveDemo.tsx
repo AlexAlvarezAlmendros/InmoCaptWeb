@@ -149,8 +149,8 @@ export function InteractiveDemo() {
 
   return (
     <div className="overflow-hidden rounded-xl border border-border-light bg-card-light shadow-2xl dark:border-border-dark dark:bg-card-dark">
-      {/* ── Browser Chrome ─────────────────────────────────────── */}
-      <div className="flex items-center gap-2 border-b border-border-light bg-slate-100 px-4 py-2 dark:border-border-dark dark:bg-slate-900/60">
+      {/* ── Browser Chrome (desktop) ────────────────────────────── */}
+      <div className="hidden items-center gap-2 border-b border-border-light bg-slate-100 px-4 py-2 dark:border-border-dark dark:bg-slate-900/60 sm:flex">
         <div className="flex gap-1.5">
           <div className="h-3 w-3 rounded-full bg-red-400" />
           <div className="h-3 w-3 rounded-full bg-yellow-400" />
@@ -178,12 +178,37 @@ export function InteractiveDemo() {
         </Badge>
       </div>
 
+      {/* ── Mobile Status Bar ──────────────────────────────────── */}
+      <div className="flex items-center justify-between border-b border-border-light bg-slate-100 px-3 py-1.5 dark:border-border-dark dark:bg-slate-900/60 sm:hidden">
+        <span className="text-[10px] text-slate-400">9:41</span>
+        <div className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 dark:bg-slate-800">
+          <svg
+            className="h-2.5 w-2.5 text-green-500"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path
+              fillRule="evenodd"
+              d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <span className="text-[10px] text-slate-500">inmocapt.com</span>
+        </div>
+        <Badge variant="info" className="text-[8px]">
+          Demo
+        </Badge>
+      </div>
+
       {/* ── App Header (replica of AppLayout) ──────────────────── */}
       <div className="border-b border-border-light bg-card-light/90 backdrop-blur-sm dark:border-border-dark dark:bg-card-dark/90">
-        <div className="flex h-11 items-center justify-between px-4">
-          <div className="flex items-center gap-5">
-            <span className="text-sm font-bold text-primary">InmoCapt</span>
-            <nav className="flex items-center gap-0.5">
+        <div className="flex h-10 items-center justify-between px-3 sm:h-11 sm:px-4">
+          <div className="flex items-center gap-3 sm:gap-5">
+            <span className="text-xs font-bold text-primary sm:text-sm">
+              InmoCapt
+            </span>
+            {/* Desktop nav */}
+            <nav className="hidden items-center gap-0.5 sm:flex">
               <button
                 onClick={() => setView("dashboard")}
                 className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
@@ -202,11 +227,27 @@ export function InteractiveDemo() {
               </span>
             </nav>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <span className="hidden text-xs text-slate-500 sm:inline">
               agente@demo.com
             </span>
-            <span className="cursor-default rounded-lg px-2 py-1 text-xs text-slate-400">
+            {/* Mobile hamburger icon */}
+            <div className="flex h-6 w-6 items-center justify-center rounded text-slate-400 sm:hidden">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </div>
+            <span className="hidden cursor-default rounded-lg px-2 py-1 text-xs text-slate-400 sm:inline">
               Cerrar sesión
             </span>
           </div>
@@ -214,7 +255,7 @@ export function InteractiveDemo() {
       </div>
 
       {/* ── Main Content Area ──────────────────────────────────── */}
-      <div className="h-[480px] overflow-y-auto bg-surface-light p-5 dark:bg-surface-dark">
+      <div className="h-[420px] overflow-y-auto bg-surface-light p-3 dark:bg-surface-dark sm:h-[480px] sm:p-5">
         {view === "dashboard" ? (
           <DemoDashboard lists={demoLists} onListClick={handleListClick} />
         ) : (
@@ -247,16 +288,16 @@ function DemoDashboard({
 }) {
   return (
     <div>
-      <div className="mb-5">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+      <div className="mb-3 sm:mb-5">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white sm:text-xl">
           Mis Listas
         </h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400 sm:mt-1 sm:text-sm">
           Accede a tus listados FSBO suscritos
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {lists.map((list) => (
           <button
             key={list.id}
@@ -367,14 +408,16 @@ function DemoListDetail({
         </div>
 
         {/* State filter pills */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Filtrar:</span>
-          <div className="flex rounded-lg border border-border-light dark:border-border-dark">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="hidden text-xs text-slate-500 sm:inline">
+            Filtrar:
+          </span>
+          <div className="flex flex-wrap gap-1 sm:flex-nowrap sm:gap-0 sm:rounded-lg sm:border sm:border-border-light sm:dark:border-border-dark">
             {STATE_FILTERS.map((f) => (
               <button
                 key={f.value}
                 onClick={() => onFilterChange(f.value)}
-                className={`px-2 py-1 text-xs font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
+                className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors sm:rounded-none sm:text-xs sm:first:rounded-l-lg sm:last:rounded-r-lg ${
                   stateFilter === f.value
                     ? "bg-primary text-white"
                     : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
@@ -388,7 +431,7 @@ function DemoListDetail({
       </div>
 
       {/* ── Stats row (matches real) ─────────────────────────── */}
-      <div className="mb-4 grid grid-cols-4 gap-3">
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:mb-4 sm:grid-cols-4 sm:gap-3">
         {PROPERTY_STATES.map((state) => (
           <button
             key={state.value}
@@ -412,8 +455,8 @@ function DemoListDetail({
         ))}
       </div>
 
-      {/* ── Properties Table (matches real) ──────────────────── */}
-      <div className="overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark">
+      {/* ── Properties Table (desktop) ─────────────────────── */}
+      <div className="hidden overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark sm:block">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -461,10 +504,25 @@ function DemoListDetail({
         </div>
       </div>
 
+      {/* ── Properties Cards (mobile) ─────────────────────────── */}
+      <div className="space-y-2.5 sm:hidden">
+        {properties.map((property) => (
+          <DemoPropertyCard
+            key={property.id}
+            property={property}
+            isEditing={editingComment === property.id}
+            onEdit={() => setEditingComment(property.id)}
+            onStopEdit={() => setEditingComment(null)}
+            onStateChange={onStateChange}
+            onCommentChange={onCommentChange}
+          />
+        ))}
+      </div>
+
       {/* ── Footer (matches real) ────────────────────────────── */}
-      <p className="mt-3 text-center text-[11px] text-slate-400">
+      <p className="mt-3 text-center text-[10px] text-slate-400 sm:text-[11px]">
         Mostrando {properties.length} de {totalCount} inmuebles
-        <span className="mx-2">•</span>
+        <span className="mx-1 sm:mx-2">•</span>
         <span className="text-primary">
           Prueba a cambiar estados y añadir comentarios
         </span>
@@ -627,5 +685,137 @@ function DemoPropertyRow({
         </span>
       </td>
     </tr>
+  );
+}
+
+// ─── Mobile Property Card ─────────────────────────────────────────
+function DemoPropertyCard({
+  property,
+  isEditing,
+  onEdit,
+  onStopEdit,
+  onStateChange,
+  onCommentChange,
+}: {
+  property: (typeof demoProperties)[0];
+  isEditing: boolean;
+  onEdit: () => void;
+  onStopEdit: () => void;
+  onStateChange: (id: string, state: PropertyState) => void;
+  onCommentChange: (id: string, comment: string) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-border-light bg-card-light p-3 dark:border-border-dark dark:bg-card-dark">
+      {/* Top row: title + state */}
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+            {property.title}
+          </p>
+          <p className="text-xs text-slate-500">{property.location}</p>
+        </div>
+        <select
+          value={property.state}
+          onChange={(e) =>
+            onStateChange(property.id, e.target.value as PropertyState)
+          }
+          className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
+            property.state === "new"
+              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+              : property.state === "contacted"
+                ? "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                : property.state === "captured"
+                  ? "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  : "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+          }`}
+        >
+          {PROPERTY_STATES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Price + details row */}
+      <div className="mb-2 flex items-center gap-3 text-xs">
+        <span className="font-semibold text-primary">
+          {formatPrice(property.price * 100, "EUR")}
+        </span>
+        <span className="text-slate-500">{property.m2} m²</span>
+        <span className="text-slate-500">{property.bedrooms} hab.</span>
+      </div>
+
+      {/* Contact row */}
+      <div className="mb-2 flex items-center justify-between text-xs">
+        <span className="text-slate-600 dark:text-slate-400">
+          {property.ownerName}
+        </span>
+        <span className="text-primary">{property.phone}</span>
+      </div>
+
+      {/* Comment row */}
+      <div className="border-t border-border-light pt-2 dark:border-border-dark">
+        {isEditing ? (
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={property.comment}
+              onChange={(e) => onCommentChange(property.id, e.target.value)}
+              onBlur={onStopEdit}
+              onKeyDown={(e) => e.key === "Enter" && onStopEdit()}
+              autoFocus
+              className="flex-1 rounded border border-primary bg-transparent px-2 py-1 text-xs focus:outline-none dark:bg-slate-800"
+              placeholder="Añadir comentario..."
+            />
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onStopEdit();
+              }}
+              className="text-green-600"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onEdit}
+            className="flex w-full items-center gap-1 text-xs text-slate-500"
+          >
+            <svg
+              className="h-3 w-3 shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+              />
+            </svg>
+            <span className="truncate">
+              {property.comment || (
+                <span className="italic text-slate-400">Añadir nota...</span>
+              )}
+            </span>
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

@@ -26,7 +26,9 @@ import {
   sendListUpdatedEmail,
   sendListRequestApprovedEmail,
   sendListRequestRejectedEmail,
+  notifyListSubscribers,
 } from "../services/emailService.js";
+import { getListSubscribersWithNotifications } from "../services/subscriptionService.js";
 
 interface AutomationUploadBody {
   listId?: string;
@@ -251,11 +253,36 @@ export async function automationRoutes(fastify: FastifyInstance) {
         stats: result.stats,
       });
 
+      // Notify subscribers if new properties were added
+      let emailStats: { sent: number; failed: number } | undefined;
+      if (result.stats.new > 0) {
+        try {
+          const list = await getListById(listId);
+          const subscribers = await getListSubscribersWithNotifications(listId);
+          const emailResult = await notifyListSubscribers(
+            subscribers,
+            list?.name ?? "Lista actualizada",
+            result.stats.new,
+            listId,
+          );
+          emailStats = emailResult;
+          request.log.info(
+            `List update notifications: ${emailResult.sent} sent, ${emailResult.failed} failed`,
+          );
+        } catch (emailErr) {
+          request.log.warn(
+            { err: emailErr },
+            "Failed to send list update notifications",
+          );
+        }
+      }
+
       return {
         success: true,
         listId,
         listCreated,
         stats: result.stats,
+        notifications: emailStats,
         errors: result.errors.length > 0 ? result.errors : undefined,
       };
     },

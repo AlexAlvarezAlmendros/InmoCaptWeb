@@ -141,12 +141,11 @@ export async function getUserSubscriptions(
         l.currency,
         l.last_updated_at,
         (SELECT COUNT(*) FROM properties WHERE list_id = l.id) as total_properties,
-        (SELECT COUNT(*) FROM properties p 
-         WHERE p.list_id = l.id 
-         AND NOT EXISTS (
-           SELECT 1 FROM property_agent_state pas 
-           WHERE pas.property_id = p.id AND pas.user_id = ?
-         )
+        COALESCE(
+          (SELECT added_count FROM list_updates 
+           WHERE list_id = l.id 
+           ORDER BY created_at DESC LIMIT 1),
+          0
         ) as new_properties_count
       FROM subscriptions s
       JOIN lists l ON l.id = s.list_id
@@ -154,7 +153,7 @@ export async function getUserSubscriptions(
         AND s.status IN ('active', 'past_due')
       ORDER BY s.created_at DESC
     `,
-    args: [userId, userId],
+    args: [userId],
   });
 
   return result.rows as unknown as UserSubscription[];

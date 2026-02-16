@@ -4,7 +4,6 @@ import {
   ensureUserExists,
   getUserSubscriptions,
   updateUserPreferences,
-  getUserById,
   deleteUser,
 } from "../services/userService.js";
 import {

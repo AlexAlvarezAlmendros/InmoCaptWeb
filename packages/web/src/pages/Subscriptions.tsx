@@ -275,79 +275,146 @@ export function SubscriptionsPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border-light bg-card-light dark:border-border-dark dark:bg-card-dark">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border-light bg-slate-50 dark:border-border-dark dark:bg-slate-900/50">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Lista
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Inmuebles
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Renovación
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Estado
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-light dark:divide-border-dark">
-                {activeSubscriptions.map((sub) => (
-                  <tr
-                    key={sub.id}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-900/30"
-                  >
-                    <td className="px-4 py-4">
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-white">
-                          {sub.listName}
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          {sub.listLocation}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
-                      {sub.totalProperties}
-                    </td>
-                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
-                      {sub.currentPeriodEnd
-                        ? formatDate(sub.currentPeriodEnd)
-                        : "-"}
-                    </td>
-                    <td className="px-4 py-4">
-                      <Badge variant="success">Activa</Badge>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => navigate(`/app/lists/${sub.listId}`)}
-                        >
-                          Ver lista
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() =>
-                            handleOpenCancelModal(sub.id, sub.listName)
-                          }
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </td>
+          <>
+            {/* Mobile: cards */}
+            <div className="space-y-4 md:hidden">
+              {activeSubscriptions.map((sub) => (
+                <div
+                  key={sub.id}
+                  className="rounded-lg border border-border-light bg-card-light p-4 dark:border-border-dark dark:bg-card-dark"
+                >
+                  <div className="mb-3 flex items-start justify-between">
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-white">
+                        {sub.listName}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {sub.listLocation}
+                      </p>
+                    </div>
+                    <Badge variant="success">Activa</Badge>
+                  </div>
+                  <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                        Inmuebles
+                      </p>
+                      <p className="text-slate-700 dark:text-slate-300">
+                        {sub.totalProperties}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                        Renovación
+                      </p>
+                      <p className="text-slate-700 dark:text-slate-300">
+                        {sub.currentPeriodEnd
+                          ? formatDate(sub.currentPeriodEnd)
+                          : "-"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => navigate(`/app/lists/${sub.listId}`)}
+                    >
+                      Ver lista
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() =>
+                        handleOpenCancelModal(sub.id, sub.listName)
+                      }
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden overflow-hidden rounded-lg border border-border-light bg-card-light md:block dark:border-border-dark dark:bg-card-dark">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border-light bg-slate-50 dark:border-border-dark dark:bg-slate-900/50">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Lista
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Inmuebles
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Renovación
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Estado
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Acciones
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border-light dark:divide-border-dark">
+                  {activeSubscriptions.map((sub) => (
+                    <tr
+                      key={sub.id}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-900/30"
+                    >
+                      <td className="px-4 py-4">
+                        <div>
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            {sub.listName}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            {sub.listLocation}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
+                        {sub.totalProperties}
+                      </td>
+                      <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
+                        {sub.currentPeriodEnd
+                          ? formatDate(sub.currentPeriodEnd)
+                          : "-"}
+                      </td>
+                      <td className="px-4 py-4">
+                        <Badge variant="success">Activa</Badge>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              navigate(`/app/lists/${sub.listId}`)
+                            }
+                          >
+                            Ver lista
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() =>
+                              handleOpenCancelModal(sub.id, sub.listName)
+                            }
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
 

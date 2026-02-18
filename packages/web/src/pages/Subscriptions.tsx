@@ -392,9 +392,7 @@ export function SubscriptionsPage() {
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={() =>
-                              navigate(`/app/lists/${sub.listId}`)
-                            }
+                            onClick={() => navigate(`/app/lists/${sub.listId}`)}
                           >
                             Ver lista
                           </Button>

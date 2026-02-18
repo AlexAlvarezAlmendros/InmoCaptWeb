@@ -483,7 +483,7 @@ export interface FotocasaRawProperty {
   descripcion?: string | null;
   anunciante?: string;
   fecha_scraping?: string;
-  telefono?: string | null; // "+34636517189" or "636517189" or null
+  telefono?: string | null; // "+34621194093" or "621194093" or null
 }
 
 export interface FotocasaUpload {

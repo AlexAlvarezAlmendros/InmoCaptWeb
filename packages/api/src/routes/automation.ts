@@ -80,7 +80,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
    * {
    *   "ubicacion": "Igualada",
    *   "viviendas": [
-   *     { "precio": "60.000 €", "url": "https://...", "telefono": "636517189", ... }
+   *     { "precio": "60.000 €", "url": "https://...", "telefono": "621194093", ... }
    *   ]
    * }
    */

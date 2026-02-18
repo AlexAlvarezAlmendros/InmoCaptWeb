@@ -130,7 +130,7 @@ export const fotocasaPropertySchema = z.object({
   descripcion: z.string().nullable().optional(),
   anunciante: z.string().optional(),
   fecha_scraping: z.string().optional(),
-  telefono: z.string().nullable().optional(), // "+34636517189" or "636517189" or null
+  telefono: z.string().nullable().optional(), // "+34621194093" or "621194093" or null
 });
 
 // Schema for Idealista JSON format

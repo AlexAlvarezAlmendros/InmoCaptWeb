@@ -30,8 +30,8 @@ export function LandingPage() {
       <section className="mx-auto max-w-7xl px-4 py-12 sm:py-20 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-5xl md:text-6xl">
-            Accede a listados <span className="text-primary">FSBO</span>{" "}
-            exclusivos
+            Accede a listados de{" "}
+            <span className="text-primary">particulares</span> exclusivos
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-600 dark:text-slate-400">
             La plataforma que conecta agentes inmobiliarios con propietarios

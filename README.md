@@ -1,6 +1,6 @@
-# InmoCapt - Plataforma FSBO para Agentes Inmobiliarios
+# InmoCapt - Plataforma de Captación de Particulares para Agentes Inmobiliarios
 
-Plataforma SaaS que permite a agentes inmobiliarios acceder mediante suscripción a listados de propietarios particulares (FSBO - For Sale By Owner).
+Plataforma SaaS que permite a agentes inmobiliarios acceder mediante suscripción a listados de propietarios particulares que venden sin intermediarios.
 
 ## Stack Tecnológico
 

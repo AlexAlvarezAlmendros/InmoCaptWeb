@@ -293,7 +293,7 @@ function DemoDashboard({
           Mis Listas
         </h2>
         <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400 sm:mt-1 sm:text-sm">
-          Accede a tus listados FSBO suscritos
+          Accede a tus listados de particulares suscritos
         </p>
       </div>
 

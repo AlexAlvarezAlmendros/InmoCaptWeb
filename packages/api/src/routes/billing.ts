@@ -90,7 +90,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
                 currency: list.currency.toLowerCase(),
                 product_data: {
                   name: `Suscripción: ${list.name}`,
-                  description: `Acceso a listados FSBO en ${list.location}`,
+                  description: `Acceso a listados de particulares en ${list.location}`,
                   metadata: {
                     listId,
                   },

@@ -88,7 +88,7 @@ export function CreateEditListModal({
       description={
         isEditing
           ? "Modifica los datos de la lista"
-          : "Crea una nueva lista de propiedades FSBO"
+          : "Crea una nueva lista de propiedades de particulares"
       }
       size="md"
     >

@@ -2,7 +2,7 @@
   "name": "inmocapt-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Plataforma FSBO para agentes inmobiliarios",
+  "description": "Plataforma de captación de particulares para agentes inmobiliarios",
   "workspaces": [
     "packages/*"
   ],
@@ -18,7 +18,7 @@
     "test": "npm run test --workspaces --if-present"
   },
   "keywords": [
-    "fsbo",
+    "captacion-particulares",
     "real-estate",
     "saas",
     "subscription"

@@ -49,7 +49,7 @@ export function PrivacyPolicyPage() {
       <h2>3. Finalidad del tratamiento</h2>
       <p>Tratamos tus datos para las siguientes finalidades:</p>
       <ul>
-        <li>Prestación del servicio contratado (acceso a listados FSBO).</li>
+        <li>Prestación del servicio contratado (acceso a listados de particulares).</li>
         <li>Gestión de tu cuenta y suscripciones.</li>
         <li>Procesamiento de pagos a través de Stripe.</li>
         <li>

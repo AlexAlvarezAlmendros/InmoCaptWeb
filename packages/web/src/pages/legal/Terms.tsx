@@ -41,7 +41,7 @@ export function TermsPage() {
         {LEGAL.tradeName} es una plataforma SaaS que permite a agentes
         inmobiliarios acceder, mediante suscripción de pago, a listados
         actualizados de propietarios particulares que desean vender su inmueble
-        (FSBO — For Sale By Owner).
+        (venta directa de particular a particular, sin intermediarios).
       </p>
       <p>El servicio incluye:</p>
       <ul>
@@ -180,7 +180,7 @@ export function TermsPage() {
       <h2>11. Limitación de responsabilidad</h2>
       <ul>
         <li>
-          Los datos de los listados FSBO se proporcionan tal cual ("as is").{" "}
+          Los datos de los listados de particulares se proporcionan tal cual ("as is").{" "}
           {LEGAL.tradeName} no garantiza la exactitud, completitud ni
           actualización de la información de los inmuebles.
         </li>

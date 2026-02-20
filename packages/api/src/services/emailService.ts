@@ -57,7 +57,7 @@ function emailLayout(content: string): string {
     ${content}
     <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 32px 0 16px;">
     <p style="color: #94a3b8; font-size: 12px; margin: 0; text-align: center;">
-      InmoCapt &mdash; Listados FSBO para agentes inmobiliarios
+      InmoCapt &mdash; Captación de particulares para agentes inmobiliarios
       <br>
       <a href="${env.FRONTEND_URL}/app/account" style="color: #94a3b8;">Gestionar preferencias de notificación</a>
     </p>

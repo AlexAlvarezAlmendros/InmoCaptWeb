@@ -44,7 +44,7 @@ export function DashboardPage() {
             Mis Listas
           </h1>
           <p className="mt-1 text-slate-600 dark:text-slate-400">
-            Accede a tus listados FSBO suscritos
+            Accede a tus listados de particulares suscritos
           </p>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -98,7 +98,7 @@ export function DashboardPage() {
           Mis Listas
         </h1>
         <p className="mt-1 text-slate-600 dark:text-slate-400">
-          Accede a tus listados FSBO suscritos
+          Accede a tus listados de particulares suscritos
         </p>
       </div>
 
@@ -126,7 +126,7 @@ export function DashboardPage() {
               </h3>
               <p className="mb-4 text-slate-500">
                 Explora las listas disponibles y suscríbete para acceder a los
-                inmuebles FSBO.
+                inmuebles de particulares.
               </p>
               <button
                 onClick={() => navigate("/app/subscriptions")}

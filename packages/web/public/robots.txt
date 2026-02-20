@@ -1,0 +1,7 @@
+# robots.txt — InmoCapt
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+Sitemap: https://inmocapt.com/sitemap.xml

@@ -2,6 +2,7 @@ import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import { Button } from "@/components/ui";
 import { useUserRoles } from "@/hooks/useUserRoles";
+import { useSEO } from "@/hooks/useSEO";
 import { useState } from "react";
 
 export function AppLayout() {
@@ -9,6 +10,8 @@ export function AppLayout() {
   const { isAdmin } = useUserRoles();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useSEO({ title: "Panel de Agente | InmoCapt", noindex: true });
 
   const handleLogout = () => {
     logout({ logoutParams: { returnTo: window.location.origin } });

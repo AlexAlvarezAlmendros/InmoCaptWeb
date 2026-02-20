@@ -143,3 +143,5 @@ vite.config.ts.timestamp-*
 .github/instructions/guia_diseño.instructions.md
 docs/automation-api.md
 packages/api/src/templates/promo-email.html
+.agents/skills/programmatic-seo/SKILL.md
+.agents/skills/programmatic-seo/references/playbooks.md

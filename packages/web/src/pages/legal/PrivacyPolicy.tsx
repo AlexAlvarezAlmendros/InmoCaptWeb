@@ -1,7 +1,15 @@
 import { LegalLayout } from "@/components/layouts/LegalLayout";
 import { LEGAL } from "@/lib/legal";
+import { useSEO } from "@/hooks/useSEO";
 
 export function PrivacyPolicyPage() {
+  useSEO({
+    title: "Política de Privacidad",
+    description:
+      "Política de privacidad de InmoCapt. Cómo tratamos tus datos personales conforme al RGPD y la LOPDGDD.",
+    canonical: "https://inmocapt.com/legal/privacidad",
+  });
+
   return (
     <LegalLayout title="Política de Privacidad" lastUpdated={LEGAL.lastUpdated}>
       <h2>1. Responsable del tratamiento</h2>

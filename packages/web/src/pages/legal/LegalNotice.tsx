@@ -1,7 +1,15 @@
 import { LegalLayout } from "@/components/layouts/LegalLayout";
 import { LEGAL } from "@/lib/legal";
+import { useSEO } from "@/hooks/useSEO";
 
 export function LegalNoticePage() {
+  useSEO({
+    title: "Aviso Legal",
+    description:
+      "Aviso legal e información del titular de InmoCapt, plataforma de captación de propietarios particulares para agentes inmobiliarios.",
+    canonical: "https://inmocapt.com/legal/aviso-legal",
+  });
+
   return (
     <LegalLayout title="Aviso Legal" lastUpdated={LEGAL.lastUpdated}>
       <h2>1. Datos identificativos</h2>

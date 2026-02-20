@@ -1,7 +1,15 @@
 import { LegalLayout } from "@/components/layouts/LegalLayout";
 import { LEGAL } from "@/lib/legal";
+import { useSEO } from "@/hooks/useSEO";
 
 export function CookiesPolicyPage() {
+  useSEO({
+    title: "Política de Cookies",
+    description:
+      "Política de cookies de InmoCapt. Información sobre las cookies que utilizamos y cómo gestionarlas.",
+    canonical: "https://inmocapt.com/legal/cookies",
+  });
+
   return (
     <LegalLayout title="Política de Cookies" lastUpdated={LEGAL.lastUpdated}>
       <h2>1. ¿Qué son las cookies?</h2>

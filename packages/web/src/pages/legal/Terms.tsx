@@ -1,7 +1,15 @@
 import { LegalLayout } from "@/components/layouts/LegalLayout";
 import { LEGAL } from "@/lib/legal";
+import { useSEO } from "@/hooks/useSEO";
 
 export function TermsPage() {
+  useSEO({
+    title: "Términos y Condiciones",
+    description:
+      "Términos y condiciones de uso de InmoCapt, plataforma de suscripción a listados de propietarios particulares para agentes inmobiliarios.",
+    canonical: "https://inmocapt.com/legal/terminos",
+  });
+
   return (
     <LegalLayout
       title="Términos y Condiciones de Uso"

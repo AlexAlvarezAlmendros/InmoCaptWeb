@@ -1,12 +1,15 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import { Button } from "@/components/ui";
+import { useSEO } from "@/hooks/useSEO";
 import { useState } from "react";
 
 export function AdminLayout() {
   const { logout, user } = useAuth0();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useSEO({ title: "Panel Admin | InmoCapt", noindex: true });
 
   const handleLogout = () => {
     logout({ logoutParams: { returnTo: window.location.origin } });

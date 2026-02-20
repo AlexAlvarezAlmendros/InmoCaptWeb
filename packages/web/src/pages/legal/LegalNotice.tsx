@@ -44,7 +44,8 @@ export function LegalNoticePage() {
         El presente sitio web tiene por objeto poner a disposición de los
         usuarios información sobre los servicios de {LEGAL.tradeName}: una
         plataforma de suscripción a listados de propietarios particulares que
-        venden sin intermediarios, dirigida a agentes inmobiliarios profesionales.
+        venden sin intermediarios, dirigida a agentes inmobiliarios
+        profesionales.
       </p>
 
       <h2>3. Condiciones de uso</h2>
@@ -84,8 +85,9 @@ export function LegalNoticePage() {
       <ul>
         <li>
           <strong>Contenidos:</strong> la información proporcionada a través de
-          los listados de particulares se obtiene de fuentes de terceros. {LEGAL.tradeName}{" "}
-          no garantiza su exactitud, integridad ni actualización.
+          los listados de particulares se obtiene de fuentes de terceros.{" "}
+          {LEGAL.tradeName} no garantiza su exactitud, integridad ni
+          actualización.
         </li>
         <li>
           <strong>Disponibilidad:</strong> no se garantiza el acceso

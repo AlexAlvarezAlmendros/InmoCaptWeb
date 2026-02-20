@@ -180,8 +180,8 @@ export function TermsPage() {
       <h2>11. Limitación de responsabilidad</h2>
       <ul>
         <li>
-          Los datos de los listados de particulares se proporcionan tal cual ("as is").{" "}
-          {LEGAL.tradeName} no garantiza la exactitud, completitud ni
+          Los datos de los listados de particulares se proporcionan tal cual
+          ("as is"). {LEGAL.tradeName} no garantiza la exactitud, completitud ni
           actualización de la información de los inmuebles.
         </li>
         <li>

@@ -128,7 +128,9 @@ export const SubscriptionScene: React.FC = () => {
   const isVertical = width < height;
   const centerX = width / 2;
   const centerY = height / 2;
-  const topOffset = isVertical ? (height - 6 * (ROW_HEIGHT + ROW_GAP)) / 2 : TOP_OFFSET;
+  const topOffset = isVertical
+    ? (height - 6 * (ROW_HEIGHT + ROW_GAP)) / 2
+    : TOP_OFFSET;
 
   const sceneOpacity = interpolate(frame, [0, 12], [0, 1], {
     extrapolateRight: "clamp",

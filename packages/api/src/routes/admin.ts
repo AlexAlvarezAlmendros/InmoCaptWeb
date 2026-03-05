@@ -205,7 +205,9 @@ export async function adminRoutes(fastify: FastifyInstance) {
       // Extract urls array from body (support the full JSON format with urls field)
       const urls = body.urls;
       if (!urls) {
-        return reply.status(400).send({ error: "Missing 'urls' field in JSON" });
+        return reply
+          .status(400)
+          .send({ error: "Missing 'urls' field in JSON" });
       }
 
       const validation = zodValidate(bulkDiscontinuedSchema, { urls });

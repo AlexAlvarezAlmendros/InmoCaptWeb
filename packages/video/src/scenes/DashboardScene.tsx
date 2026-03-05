@@ -172,9 +172,30 @@ export const DashboardScene: React.FC = () => {
         {isVertical ? (
           /* Hamburger menu icon (mobile nav) */
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            <div style={{ width: 22, height: 2, backgroundColor: colors.textSecondary, borderRadius: 1 }} />
-            <div style={{ width: 22, height: 2, backgroundColor: colors.textSecondary, borderRadius: 1 }} />
-            <div style={{ width: 22, height: 2, backgroundColor: colors.textSecondary, borderRadius: 1 }} />
+            <div
+              style={{
+                width: 22,
+                height: 2,
+                backgroundColor: colors.textSecondary,
+                borderRadius: 1,
+              }}
+            />
+            <div
+              style={{
+                width: 22,
+                height: 2,
+                backgroundColor: colors.textSecondary,
+                borderRadius: 1,
+              }}
+            />
+            <div
+              style={{
+                width: 22,
+                height: 2,
+                backgroundColor: colors.textSecondary,
+                borderRadius: 1,
+              }}
+            />
           </div>
         ) : (
           /* Desktop nav items */

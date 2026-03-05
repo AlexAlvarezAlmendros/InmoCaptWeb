@@ -15,7 +15,12 @@ import {
   useBulkDiscontinue,
   type UploadData,
 } from "@/hooks/useAdminLists";
-import type { AdminList, CreateListInput, UploadResult, BulkDiscontinueResult } from "@/types";
+import type {
+  AdminList,
+  CreateListInput,
+  UploadResult,
+  BulkDiscontinueResult,
+} from "@/types";
 
 export function AdminListsPage() {
   // Data fetching

@@ -156,8 +156,7 @@ const MOBILE_CARD_PAD = 24;
 const MOBILE_HEADER_H = 80;
 const MOBILE_TITLE_AREA = 170;
 const MOBILE_TOP_PAD = 20;
-const MOBILE_CARDS_TOP =
-  MOBILE_HEADER_H + MOBILE_TOP_PAD + MOBILE_TITLE_AREA;
+const MOBILE_CARDS_TOP = MOBILE_HEADER_H + MOBILE_TOP_PAD + MOBILE_TITLE_AREA;
 
 const mobileCardTop = (i: number) =>
   MOBILE_CARDS_TOP + i * (MOBILE_CARD_H + MOBILE_CARD_GAP);
@@ -415,9 +414,7 @@ export const PropertyTableScene: React.FC = () => {
                 style={{
                   fontSize: 16,
                   fontWeight: item.active ? 600 : 400,
-                  color: item.active
-                    ? colors.accent
-                    : colors.textSecondary,
+                  color: item.active ? colors.accent : colors.textSecondary,
                   paddingBottom: 4,
                   borderBottom: item.active
                     ? `2px solid ${colors.accent}`
@@ -537,8 +534,7 @@ export const PropertyTableScene: React.FC = () => {
                   backgroundColor:
                     i === 0 ? `${colors.primary}66` : "transparent",
                   color: i === 0 ? colors.white : colors.textMuted,
-                  border:
-                    i === 0 ? "none" : `1px solid ${colors.borderDark}`,
+                  border: i === 0 ? "none" : `1px solid ${colors.borderDark}`,
                 }}
               >
                 {filter}
@@ -596,8 +592,10 @@ export const PropertyTableScene: React.FC = () => {
                 extrapolateRight: "clamp",
               });
 
-              const { displayState, displayStateColor } =
-                getDisplayState(rowIndex, prop);
+              const { displayState, displayStateColor } = getDisplayState(
+                rowIndex,
+                prop,
+              );
               const estadoHL = getActiveHighlight(rowIndex, "estado");
               const commentHL = getActiveHighlight(rowIndex, "comment");
               const comment = getCommentContent(rowIndex);
@@ -703,12 +701,8 @@ export const PropertyTableScene: React.FC = () => {
                         backgroundColor: `${displayStateColor}22`,
                         color: displayStateColor,
                         transform:
-                          (rowIndex === 0 &&
-                            state1 > 0 &&
-                            state1 < 1) ||
-                          (rowIndex === 3 &&
-                            state2 > 0 &&
-                            state2 < 1)
+                          (rowIndex === 0 && state1 > 0 && state1 < 1) ||
+                          (rowIndex === 3 && state2 > 0 && state2 < 1)
                             ? `scale(${1.2 - Math.abs(0.5 - (rowIndex === 0 ? state1 : state2)) * 0.4})`
                             : "scale(1)",
                       }}
@@ -743,15 +737,11 @@ export const PropertyTableScene: React.FC = () => {
                     )}
                     {comment ? (
                       <span>
-                        <span
-                          style={{ color: colors.textSecondary }}
-                        >
+                        <span style={{ color: colors.textSecondary }}>
                           {comment.text}
                         </span>
                         {comment.showCursor && (
-                          <span style={{ color: colors.accent }}>
-                            |
-                          </span>
+                          <span style={{ color: colors.accent }}>|</span>
                         )}
                       </span>
                     ) : (
@@ -779,28 +769,17 @@ export const PropertyTableScene: React.FC = () => {
                 fps,
                 config: { damping: 18 },
               });
-              const cardY = interpolate(
-                cardSpring,
-                [0, 1],
-                [40, 0],
-              );
-              const cardOpacity = interpolate(
-                cardSpring,
-                [0, 0.3],
-                [0, 1],
-                { extrapolateRight: "clamp" },
-              );
+              const cardY = interpolate(cardSpring, [0, 1], [40, 0]);
+              const cardOpacity = interpolate(cardSpring, [0, 0.3], [0, 1], {
+                extrapolateRight: "clamp",
+              });
 
-              const { displayState, displayStateColor } =
-                getDisplayState(rowIndex, prop);
-              const estadoHL = getActiveHighlight(
+              const { displayState, displayStateColor } = getDisplayState(
                 rowIndex,
-                "estado",
+                prop,
               );
-              const commentHL = getActiveHighlight(
-                rowIndex,
-                "comment",
-              );
+              const estadoHL = getActiveHighlight(rowIndex, "estado");
+              const commentHL = getActiveHighlight(rowIndex, "comment");
               const comment = getCommentContent(rowIndex);
 
               return (
@@ -859,12 +838,8 @@ export const PropertyTableScene: React.FC = () => {
                           color: displayStateColor,
                           border: `1px solid ${displayStateColor}44`,
                           transform:
-                            (rowIndex === 0 &&
-                              state1 > 0 &&
-                              state1 < 1) ||
-                            (rowIndex === 3 &&
-                              state2 > 0 &&
-                              state2 < 1)
+                            (rowIndex === 0 && state1 > 0 && state1 < 1) ||
+                            (rowIndex === 3 && state2 > 0 && state2 < 1)
                               ? `scale(${1.15 - Math.abs(0.5 - (rowIndex === 0 ? state1 : state2)) * 0.3})`
                               : "scale(1)",
                         }}
@@ -976,11 +951,7 @@ export const PropertyTableScene: React.FC = () => {
                           {comment.text}
                         </span>
                         {comment.showCursor && (
-                          <span
-                            style={{ color: colors.accent }}
-                          >
-                            |
-                          </span>
+                          <span style={{ color: colors.accent }}>|</span>
                         )}
                       </span>
                     ) : (

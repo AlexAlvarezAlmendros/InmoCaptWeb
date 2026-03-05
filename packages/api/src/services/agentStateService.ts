@@ -24,6 +24,7 @@ export interface PropertyWithAgentState {
   ownerName: string | null;
   sourceUrl: string | null;
   createdAt: string;
+  discontinued: boolean;
   // Parsed from rawPayload (Idealista data)
   title: string | null;
   location: string | null;
@@ -167,6 +168,7 @@ export async function getPropertiesWithAgentState(
       p.owner_name as ownerName,
       p.source_url as sourceUrl,
       p.raw_payload as rawPayload,
+      p.discontinued,
       p.created_at as createdAt,
       COALESCE(pas.state, 'new') as state,
       pas.comment,
@@ -254,6 +256,7 @@ export async function getPropertiesWithAgentState(
       ownerName: row.ownerName as string | null,
       sourceUrl: row.sourceUrl as string | null,
       createdAt: row.createdAt as string,
+      discontinued: Boolean(row.discontinued),
       title,
       location,
       description,

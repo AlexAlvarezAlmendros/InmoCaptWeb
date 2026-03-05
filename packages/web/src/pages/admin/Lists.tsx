@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Button, Badge, ConfirmDialog } from "@/components/ui";
-import { CreateEditListModal, UploadPropertiesModal } from "@/components/admin";
+import {
+  CreateEditListModal,
+  UploadPropertiesModal,
+  UploadDiscontinuedModal,
+} from "@/components/admin";
 import { formatPrice, formatDate } from "@/lib/utils";
 import {
   useAdminLists,
@@ -8,9 +12,10 @@ import {
   useUpdateList,
   useDeleteList,
   useUploadProperties,
+  useBulkDiscontinue,
   type UploadData,
 } from "@/hooks/useAdminLists";
-import type { AdminList, CreateListInput, UploadResult } from "@/types";
+import type { AdminList, CreateListInput, UploadResult, BulkDiscontinueResult } from "@/types";
 
 export function AdminListsPage() {
   // Data fetching
@@ -21,9 +26,11 @@ export function AdminListsPage() {
   const updateList = useUpdateList();
   const deleteList = useDeleteList();
   const uploadProperties = useUploadProperties();
+  const bulkDiscontinue = useBulkDiscontinue();
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDiscontinuedModalOpen, setIsDiscontinuedModalOpen] = useState(false);
   const [editingList, setEditingList] = useState<AdminList | null>(null);
   const [uploadingList, setUploadingList] = useState<AdminList | null>(null);
   const [deletingList, setDeletingList] = useState<AdminList | null>(null);
@@ -56,6 +63,13 @@ export function AdminListsPage() {
       listId: uploadingList.id,
       data,
     });
+    return result.data;
+  };
+
+  const handleBulkDiscontinue = async (
+    urls: string[],
+  ): Promise<BulkDiscontinueResult> => {
+    const result = await bulkDiscontinue.mutateAsync({ urls });
     return result.data;
   };
 
@@ -115,9 +129,17 @@ export function AdminListsPage() {
             Administra todas las listas de la plataforma
           </p>
         </div>
-        <Button variant="accent" onClick={() => setIsCreateModalOpen(true)}>
-          + Nueva Lista
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setIsDiscontinuedModalOpen(true)}
+          >
+            Descatalogar
+          </Button>
+          <Button variant="accent" onClick={() => setIsCreateModalOpen(true)}>
+            + Nueva Lista
+          </Button>
+        </div>
       </div>
 
       {/* Empty state */}
@@ -240,13 +262,21 @@ export function AdminListsPage() {
         isLoading={updateList.isPending}
       />
 
-      {/* Upload Modal */}
+      {/* Upload Properties Modal */}
       <UploadPropertiesModal
         isOpen={!!uploadingList}
         onClose={() => setUploadingList(null)}
         onUpload={handleUploadProperties}
         list={uploadingList}
         isLoading={uploadProperties.isPending}
+      />
+
+      {/* Upload Discontinued Modal */}
+      <UploadDiscontinuedModal
+        isOpen={isDiscontinuedModalOpen}
+        onClose={() => setIsDiscontinuedModalOpen(false)}
+        onUpload={handleBulkDiscontinue}
+        isLoading={bulkDiscontinue.isPending}
       />
 
       {/* Delete Confirmation */}

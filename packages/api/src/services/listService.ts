@@ -63,6 +63,7 @@ export async function getAllLists(): Promise<ListWithStats[]> {
     LEFT JOIN (
       SELECT list_id, COUNT(*) as count 
       FROM properties 
+      WHERE discontinued = 0 OR discontinued IS NULL
       GROUP BY list_id
     ) prop_count ON l.id = prop_count.list_id
     ORDER BY l.created_at DESC
@@ -109,6 +110,7 @@ export async function getAvailableListsForUser(
       LEFT JOIN (
         SELECT list_id, COUNT(*) as count 
         FROM properties 
+        WHERE discontinued = 0 OR discontinued IS NULL
         GROUP BY list_id
       ) prop_count ON l.id = prop_count.list_id
       WHERE l.id NOT IN (
@@ -197,7 +199,7 @@ export async function getListWithStats(
       LEFT JOIN (
         SELECT list_id, COUNT(*) as count 
         FROM properties 
-        WHERE list_id = ?
+        WHERE list_id = ? AND (discontinued = 0 OR discontinued IS NULL)
         GROUP BY list_id
       ) prop_count ON l.id = prop_count.list_id
       WHERE l.id = ?
@@ -380,7 +382,7 @@ export async function updateListPriceByPropertyCount(
   listId: string,
 ): Promise<void> {
   const result = await db.execute({
-    sql: "SELECT COUNT(*) as count FROM properties WHERE list_id = ?",
+    sql: "SELECT COUNT(*) as count FROM properties WHERE list_id = ? AND (discontinued = 0 OR discontinued IS NULL)",
     args: [listId],
   });
   const count = (result.rows[0]?.count as number) ?? 0;

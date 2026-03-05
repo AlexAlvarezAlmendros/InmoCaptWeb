@@ -1,0 +1,25 @@
+{
+	"name": "inmocapt-video",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Video promocional de InmoCapt con Remotion",
+	"scripts": {
+		"dev": "remotion studio src/index.ts",
+		"build": "remotion render src/index.ts PromoVideo out/promo.mp4",
+		"preview": "remotion studio src/index.ts"
+	},
+	"dependencies": {
+		"@remotion/cli": "4.0.261",
+		"@remotion/google-fonts": "4.0.261",
+		"@remotion/transitions": "4.0.261",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0",
+		"remotion": "4.0.261",
+		"zod": "^3.23.0"
+	},
+	"devDependencies": {
+		"@types/react": "^19.0.0",
+		"@types/react-dom": "^19.0.0",
+		"typescript": "^5.5.0"
+	}
+}

@@ -4,7 +4,7 @@ import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import { env } from "./config/env.js";
-import { ensureSystemUser } from "./config/database.js";
+import { ensureSystemUser, runMigrations } from "./config/database.js";
 import { registerRoutes } from "./routes/index.js";
 
 // Extend FastifyRequest to include rawBody
@@ -84,6 +84,9 @@ export async function buildApp() {
 
   // Routes
   await registerRoutes(fastify);
+
+  // Run DB migrations (idempotent, safe to run on every startup)
+  await runMigrations();
 
   // Ensure system user exists for automation uploads
   await ensureSystemUser();

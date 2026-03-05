@@ -534,3 +534,80 @@ export function isFotocasaFormat(data: unknown): data is FotocasaUpload {
   const obj = data as Record<string, unknown>;
   return typeof obj.ubicacion === "string" && Array.isArray(obj.viviendas);
 }
+
+// ============================================
+// Bulk Discontinue by URLs
+// ============================================
+
+export interface BulkDiscontinueResult {
+  total: number;
+  matched: number;
+  alreadyDiscontinued: number;
+  updated: number;
+  notFound: string[];
+  affectedListIds: string[];
+}
+
+/**
+ * Mark properties as discontinued by matching their source_url.
+ * Recalculates prices for all affected lists.
+ */
+export async function bulkDiscontinueByUrls(
+  urls: string[],
+): Promise<BulkDiscontinueResult> {
+  const notFound: string[] = [];
+  const affectedListIdsSet = new Set<string>();
+  let matched = 0;
+  let alreadyDiscontinued = 0;
+  let updated = 0;
+
+  for (const url of urls) {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) continue;
+
+    // Find the property by source_url
+    const result = await db.execute({
+      sql: "SELECT id, list_id, discontinued FROM properties WHERE source_url = ?",
+      args: [trimmedUrl],
+    });
+
+    if (result.rows.length === 0) {
+      notFound.push(trimmedUrl);
+      continue;
+    }
+
+    matched++;
+    const row = result.rows[0];
+    const propertyId = row.id as string;
+    const listId = row.list_id as string;
+    const isAlreadyDiscontinued = Boolean(row.discontinued);
+
+    if (isAlreadyDiscontinued) {
+      alreadyDiscontinued++;
+      continue;
+    }
+
+    // Mark as discontinued
+    await db.execute({
+      sql: "UPDATE properties SET discontinued = 1 WHERE id = ?",
+      args: [propertyId],
+    });
+    updated++;
+    affectedListIdsSet.add(listId);
+  }
+
+  // Recalculate prices for all affected lists
+  const affectedListIds = Array.from(affectedListIdsSet);
+  for (const listId of affectedListIds) {
+    await updateListPriceByPropertyCount(listId);
+  }
+
+  return {
+    total: urls.length,
+    matched,
+    alreadyDiscontinued,
+    updated,
+    notFound,
+    affectedListIds,
+  };
+}

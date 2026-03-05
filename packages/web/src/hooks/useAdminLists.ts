@@ -7,6 +7,7 @@ import type {
   UploadResult,
   IdealistaUpload,
   PropertyInput,
+  BulkDiscontinueResult,
 } from "@/types";
 
 // Type for upload data - can be either format
@@ -121,6 +122,23 @@ export function useUploadProperties() {
       queryClient.invalidateQueries({
         queryKey: adminListsKeys.list(variables.listId),
       });
+    },
+  });
+}
+
+/**
+ * Bulk mark properties as discontinued by URL
+ */
+export function useBulkDiscontinue() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { urls: string[] }) =>
+      api.post<{ data: BulkDiscontinueResult }>("/admin/discontinued", data),
+    onSuccess: () => {
+      // Invalidate all lists since multiple could be affected
+      queryClient.invalidateQueries({ queryKey: adminListsKeys.all });
     },
   });
 }

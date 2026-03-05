@@ -12,6 +12,7 @@ import {
   uploadProperties,
   isIdealistaFormat,
   parseIdealistaUpload,
+  bulkDiscontinueByUrls,
   type PropertyInput,
 } from "../services/propertyService.js";
 import {
@@ -25,6 +26,7 @@ import {
   updateListSchema,
   uploadPropertiesSchema,
   idealistaUploadSchema,
+  bulkDiscontinuedSchema,
   zodValidate,
 } from "../schemas/validation.js";
 import { getListSubscribersWithNotifications } from "../services/subscriptionService.js";
@@ -177,6 +179,41 @@ export async function adminRoutes(fastify: FastifyInstance) {
           );
         }
       }
+
+      return { data: result };
+    },
+  );
+
+  // ============================================
+  // Bulk Discontinue Properties
+  // ============================================
+
+  /**
+   * POST /admin/discontinued
+   *
+   * Upload a JSON with a list of URLs to mark matching properties as discontinued.
+   * Recalculates prices for all affected lists automatically.
+   *
+   * Body: { "urls": ["https://...", "https://..."] }
+   */
+  fastify.post(
+    "/discontinued",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const body = request.body as Record<string, unknown>;
+
+      // Extract urls array from body (support the full JSON format with urls field)
+      const urls = body.urls;
+      if (!urls) {
+        return reply.status(400).send({ error: "Missing 'urls' field in JSON" });
+      }
+
+      const validation = zodValidate(bulkDiscontinuedSchema, { urls });
+      if (!validation.success) {
+        return reply.status(400).send({ error: validation.error });
+      }
+
+      const result = await bulkDiscontinueByUrls(validation.data.urls);
 
       return { data: result };
     },

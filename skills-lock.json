@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "remotion-animation": {
+      "source": "ncklrs/startup-os-skills",
+      "sourceType": "github",
+      "computedHash": "3886e9ced41bcf39c45d60da865970332f605e8638fc2e803bae2ad8497d61e2"
+    },
     "remotion-best-practices": {
       "source": "remotion-dev/skills",
       "sourceType": "github",

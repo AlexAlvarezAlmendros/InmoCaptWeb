@@ -53,7 +53,11 @@ function PropertyRow({
   };
 
   return (
-    <tr className="hover:bg-slate-50 dark:hover:bg-slate-900/30">
+    <tr
+      className={`hover:bg-slate-50 dark:hover:bg-slate-900/30 ${
+        property.discontinued ? "opacity-60" : ""
+      }`}
+    >
       <td className="px-3 py-3">
         <div className="max-w-[180px]">
           {property.title && (
@@ -61,13 +65,38 @@ function PropertyRow({
               {property.title}
             </p>
           )}
-          <p className="font-semibold text-primary">
+          <p
+            className={`font-semibold ${property.discontinued ? "text-slate-400 line-through dark:text-slate-500" : "text-primary"}`}
+          >
             {formatPrice(property.price * 100, "EUR")}
           </p>
           {property.location && (
             <p className="truncate text-xs text-slate-500">
               {property.location}
             </p>
+          )}
+          {property.discontinued && (
+            <div className="mt-1">
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                <svg
+                  className="h-3 w-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                  />
+                </svg>
+                Descatalogado
+              </span>
+              <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                No computa en el precio
+              </p>
+            </div>
           )}
         </div>
       </td>
@@ -246,7 +275,35 @@ function PropertyCard({
   };
 
   return (
-    <div className="rounded-lg border border-border-light bg-card-light p-3 dark:border-border-dark dark:bg-card-dark">
+    <div
+      className={`rounded-lg border border-border-light bg-card-light p-3 dark:border-border-dark dark:bg-card-dark ${
+        property.discontinued ? "opacity-60" : ""
+      }`}
+    >
+      {/* Discontinued banner */}
+      {property.discontinued && (
+        <div className="mb-2 flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 dark:bg-slate-700">
+          <svg
+            className="h-3.5 w-3.5 shrink-0 text-slate-500 dark:text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+            />
+          </svg>
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            Descatalogado
+          </span>
+          <span className="text-xs text-slate-400 dark:text-slate-500">
+            · No computa en el precio
+          </span>
+        </div>
+      )}
       {/* Top row: title + state */}
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -284,7 +341,9 @@ function PropertyCard({
 
       {/* Price + details row */}
       <div className="mb-2 flex items-center gap-3 text-sm">
-        <span className="font-semibold text-primary">
+        <span
+          className={`font-semibold ${property.discontinued ? "text-slate-400 line-through dark:text-slate-500" : "text-primary"}`}
+        >
           {formatPrice(property.price * 100, "EUR")}
         </span>
         {property.m2 && (

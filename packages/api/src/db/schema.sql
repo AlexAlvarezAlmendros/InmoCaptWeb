@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS properties (
   owner_name TEXT,
   source_url TEXT,
   raw_payload TEXT,  -- JSON string for additional data
+  discontinued INTEGER DEFAULT 0,  -- 1 = delisted, excluded from price calculation
   created_at TEXT DEFAULT (datetime('now'))
 );
 

@@ -7,6 +7,28 @@ export const db = createClient({
 });
 
 /**
+ * Run any pending column migrations safely.
+ * Uses try/catch so re-running on an already-migrated DB is safe.
+ */
+export async function runMigrations(): Promise<void> {
+  const migrations: Array<{ sql: string; description: string }> = [
+    {
+      sql: "ALTER TABLE properties ADD COLUMN discontinued INTEGER DEFAULT 0",
+      description: "Add discontinued column to properties",
+    },
+  ];
+
+  for (const migration of migrations) {
+    try {
+      await db.execute(migration.sql);
+      console.log(`✅ Migration applied: ${migration.description}`);
+    } catch {
+      // Column already exists or other benign error — skip silently
+    }
+  }
+}
+
+/**
  * Ensure the system automation user exists in the DB.
  * This prevents FK constraint errors when automation uploads
  * insert into list_updates with uploaded_by = 'system:automation'.

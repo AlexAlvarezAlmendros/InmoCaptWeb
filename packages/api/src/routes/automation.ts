@@ -1,9 +1,11 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { authenticateApiKey } from "../plugins/auth.js";
+import { db } from "../config/database.js";
 import {
   getListById,
   findListByNameAndLocation,
   findOrCreateList,
+  updateListPriceByPropertyCount,
 } from "../services/listService.js";
 import {
   uploadProperties,
@@ -11,12 +13,16 @@ import {
   isFotocasaFormat,
   parseIdealistaUpload,
   parseFotocasaUpload,
+  bulkDiscontinueByUrls,
   type PropertyInput,
 } from "../services/propertyService.js";
 import {
   automationUploadSimplifiedSchema,
   automationUploadIdealistaSchema,
   automationUploadFotocasaSchema,
+  discontinuedPropertyParamSchema,
+  discontinuedPropertyBodySchema,
+  bulkDiscontinuedSchema,
   zodValidate,
 } from "../schemas/validation.js";
 import {
@@ -285,6 +291,132 @@ export async function automationRoutes(fastify: FastifyInstance) {
         notifications: emailStats,
         errors: result.errors.length > 0 ? result.errors : undefined,
       };
+    },
+  );
+
+  /**
+   * PATCH /automation/properties/:propertyId/discontinued
+   *
+   * Mark (or unmark) a property as discontinued via API key authentication.
+   * Discontinued properties are excluded from the list price calculation.
+   * The list price is automatically recalculated after each change.
+   *
+   * Headers:
+   * - X-API-Key: Your automation API key
+   *
+   * Params:
+   * - propertyId: UUID of the property to update
+   *
+   * Body:
+   * { "discontinued": true }   // mark as discontinued
+   * { "discontinued": false }  // restore as active
+   */
+  fastify.patch(
+    "/properties/:propertyId/discontinued",
+    { preHandler: [authenticateApiKey] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      // Validate params
+      const paramsResult = zodValidate(
+        discontinuedPropertyParamSchema,
+        request.params,
+      );
+      if (!paramsResult.success) {
+        return reply.code(400).send({ error: paramsResult.error });
+      }
+
+      // Validate body
+      const bodyResult = zodValidate(
+        discontinuedPropertyBodySchema,
+        request.body,
+      );
+      if (!bodyResult.success) {
+        return reply.code(400).send({ error: bodyResult.error });
+      }
+
+      const { propertyId } = paramsResult.data;
+      const { discontinued } = bodyResult.data;
+
+      // Check that the property exists and retrieve its list_id
+      const propResult = await db.execute({
+        sql: "SELECT id, list_id FROM properties WHERE id = ?",
+        args: [propertyId],
+      });
+
+      if (propResult.rows.length === 0) {
+        return reply.code(404).send({ error: "Property not found" });
+      }
+
+      const listId = propResult.rows[0].list_id as string;
+
+      // Update the discontinued flag
+      await db.execute({
+        sql: "UPDATE properties SET discontinued = ? WHERE id = ?",
+        args: [discontinued ? 1 : 0, propertyId],
+      });
+
+      // Recalculate list price (only active properties count)
+      await updateListPriceByPropertyCount(listId);
+
+      request.log.info(
+        { propertyId, listId, discontinued },
+        `Property marked as ${discontinued ? "discontinued" : "active"}`,
+      );
+
+      return {
+        success: true,
+        propertyId,
+        listId,
+        discontinued,
+        message: discontinued
+          ? "Property marked as discontinued and list price updated"
+          : "Property restored as active and list price updated",
+      };
+    },
+  );
+
+  /**
+   * POST /automation/discontinued
+   *
+   * Bulk-mark properties as discontinued by their source URLs.
+   * Accepts the same JSON format as the scraper output:
+   * { "urls": ["https://...", ...], ... }
+   *
+   * Extra fields (timestamp, total, detalle, etc.) are ignored.
+   * Recalculates list prices for all affected lists.
+   *
+   * Headers:
+   * - X-API-Key: Your automation API key
+   */
+  fastify.post(
+    "/discontinued",
+    { preHandler: [authenticateApiKey] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const body = request.body as Record<string, unknown>;
+
+      const urls = body.urls;
+      if (!urls) {
+        return reply.code(400).send({ error: "Missing 'urls' field in JSON" });
+      }
+
+      const validation = zodValidate(bulkDiscontinuedSchema, { urls });
+      if (!validation.success) {
+        return reply.code(400).send({ error: validation.error });
+      }
+
+      const result = await bulkDiscontinueByUrls(validation.data.urls);
+
+      request.log.info(
+        {
+          total: result.total,
+          matched: result.matched,
+          updated: result.updated,
+          notFound: result.notFound.length,
+          affectedLists: result.affectedListIds.length,
+        },
+        "Bulk discontinue completed",
+      );
+
+      return { success: true, data: result };
     },
   );
 

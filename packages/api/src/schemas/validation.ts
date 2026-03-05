@@ -238,6 +238,26 @@ export type AutomationUploadFotocasaInput = z.infer<
   typeof automationUploadFotocasaSchema
 >;
 
+// Schema for marking a property as discontinued via automation
+export const discontinuedPropertyParamSchema = z.object({
+  propertyId: z.string().uuid("Invalid property ID"),
+});
+
+export const discontinuedPropertyBodySchema = z.object({
+  discontinued: z.boolean(),
+});
+
+export type DiscontinuedPropertyInput = z.infer<
+  typeof discontinuedPropertyBodySchema
+>;
+
+// Schema for bulk discontinuing properties by URL
+export const bulkDiscontinuedSchema = z.object({
+  urls: z.array(z.string().url()).min(1, "At least one URL is required"),
+});
+
+export type BulkDiscontinuedInput = z.infer<typeof bulkDiscontinuedSchema>;
+
 // ============================================
 // Helper for Fastify validation
 // ============================================

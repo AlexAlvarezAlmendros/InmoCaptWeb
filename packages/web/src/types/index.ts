@@ -109,6 +109,7 @@ export interface Property {
   ownerName: string | null;
   sourceUrl: string | null;
   createdAt: string;
+  discontinued: boolean;
   // Agent-specific state
   state: PropertyState;
   comment: string | null;
@@ -191,4 +192,14 @@ export interface ApiError {
   message: string;
   code?: string;
   statusCode: number;
+}
+
+// Bulk discontinue result
+export interface BulkDiscontinueResult {
+  total: number;
+  matched: number;
+  alreadyDiscontinued: number;
+  updated: number;
+  notFound: string[];
+  affectedListIds: string[];
 }

@@ -29,8 +29,7 @@ export function useAdminUser(userId: string | null) {
 
   return useQuery({
     queryKey: adminUsersKeys.detail(userId ?? ""),
-    queryFn: () =>
-      api.get<{ data: AdminUserDetail }>(`/admin/users/${userId}`),
+    queryFn: () => api.get<{ data: AdminUserDetail }>(`/admin/users/${userId}`),
     select: (response) => response.data,
     enabled: !!userId,
   });
@@ -44,8 +43,13 @@ export function useToggleTestUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ userId, isTestUser }: { userId: string; isTestUser: boolean }) =>
-      api.patch(`/admin/users/${userId}/test`, { isTestUser }),
+    mutationFn: ({
+      userId,
+      isTestUser,
+    }: {
+      userId: string;
+      isTestUser: boolean;
+    }) => api.patch(`/admin/users/${userId}/test`, { isTestUser }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminUsersKeys.all });
     },

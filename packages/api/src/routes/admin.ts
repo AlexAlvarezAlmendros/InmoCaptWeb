@@ -8,7 +8,13 @@ import {
   updateList,
   deleteList,
 } from "../services/listService.js";
-import { ensureUserExists, getUserById, getAllUsersWithStats, getUserWithSubscriptions, setUserTestStatus } from "../services/userService.js";
+import {
+  ensureUserExists,
+  getUserById,
+  getAllUsersWithStats,
+  getUserWithSubscriptions,
+  setUserTestStatus,
+} from "../services/userService.js";
 import {
   uploadProperties,
   isIdealistaFormat,

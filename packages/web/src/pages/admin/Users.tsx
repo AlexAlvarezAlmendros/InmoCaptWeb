@@ -2,8 +2,16 @@ import { useState } from "react";
 import { Badge, Button } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { formatDate, formatPrice } from "@/lib/utils";
-import { useAdminUsers, useAdminUser, useToggleTestUser } from "@/hooks/useAdminUsers";
-import type { AdminUser, AdminUserSubscription, SubscriptionStatus } from "@/types";
+import {
+  useAdminUsers,
+  useAdminUser,
+  useToggleTestUser,
+} from "@/hooks/useAdminUsers";
+import type {
+  AdminUser,
+  AdminUserSubscription,
+  SubscriptionStatus,
+} from "@/types";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -80,7 +88,9 @@ function UserDetailModal({
                   Notif. email
                 </dt>
                 <dd className="mt-0.5">
-                  <Badge variant={user.emailNotificationsOn ? "success" : "default"}>
+                  <Badge
+                    variant={user.emailNotificationsOn ? "success" : "default"}
+                  >
                     {user.emailNotificationsOn ? "Activadas" : "Desactivadas"}
                   </Badge>
                 </dd>
@@ -139,39 +149,37 @@ function UserDetailModal({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-light dark:divide-border-dark">
-                    {user.subscriptions.map(
-                      (sub: AdminUserSubscription) => (
-                        <tr
-                          key={sub.id}
-                          className="hover:bg-slate-50 dark:hover:bg-slate-900/30"
-                        >
-                          <td className="px-3 py-2">
-                            <div className="font-medium text-slate-900 dark:text-white">
-                              {sub.listName}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              {sub.listLocation}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2">
-                            <SubscriptionStatusBadge
-                              status={sub.status as SubscriptionStatus}
-                            />
-                          </td>
-                          <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">
-                            {formatPrice(sub.priceCents, sub.currency)}/mes
-                          </td>
-                          <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
-                            {sub.currentPeriodEnd
-                              ? formatDate(sub.currentPeriodEnd)
-                              : "—"}
-                          </td>
-                          <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
-                            {formatDate(sub.createdAt)}
-                          </td>
-                        </tr>
-                      ),
-                    )}
+                    {user.subscriptions.map((sub: AdminUserSubscription) => (
+                      <tr
+                        key={sub.id}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-900/30"
+                      >
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-slate-900 dark:text-white">
+                            {sub.listName}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {sub.listLocation}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <SubscriptionStatusBadge
+                            status={sub.status as SubscriptionStatus}
+                          />
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">
+                          {formatPrice(sub.priceCents, sub.currency)}/mes
+                        </td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
+                          {sub.currentPeriodEnd
+                            ? formatDate(sub.currentPeriodEnd)
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
+                          {formatDate(sub.createdAt)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -268,8 +276,9 @@ export function AdminUsersPage() {
             },
             {
               label: "Con suscripción activa",
-              value: realUsers.filter((u: AdminUser) => u.activeSubscriptionCount > 0)
-                .length,
+              value: realUsers.filter(
+                (u: AdminUser) => u.activeSubscriptionCount > 0,
+              ).length,
               color: "text-accent",
             },
             {
@@ -446,7 +455,11 @@ export function AdminUsersPage() {
                             })
                           }
                           disabled={toggleTestUser.isPending}
-                          className={user.isTestUser ? "text-amber-600 hover:text-amber-700" : "text-slate-500"}
+                          className={
+                            user.isTestUser
+                              ? "text-amber-600 hover:text-amber-700"
+                              : "text-slate-500"
+                          }
                         >
                           {user.isTestUser ? "Quitar test" : "Marcar test"}
                         </Button>

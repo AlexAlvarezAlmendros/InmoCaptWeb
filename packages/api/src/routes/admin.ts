@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { authenticate, requireRole, type AuthUser } from "../plugins/auth.js";
+import { db } from "../config/database.js";
 import {
   getAllLists,
   getListById,
@@ -7,7 +8,7 @@ import {
   updateList,
   deleteList,
 } from "../services/listService.js";
-import { ensureUserExists, getUserById } from "../services/userService.js";
+import { ensureUserExists, getUserById, getAllUsersWithStats, getUserWithSubscriptions, setUserTestStatus } from "../services/userService.js";
 import {
   uploadProperties,
   isIdealistaFormat,
@@ -24,6 +25,7 @@ import {
 import {
   createListSchema,
   updateListSchema,
+  updateSettingsSchema,
   uploadPropertiesSchema,
   idealistaUploadSchema,
   bulkDiscontinuedSchema,
@@ -347,6 +349,201 @@ export async function adminRoutes(fastify: FastifyInstance) {
       }
 
       return { data: result };
+    },
+  );
+
+  // ============================================
+  // Users Management
+  // ============================================
+
+  // Get all users with subscription stats
+  fastify.get(
+    "/users",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (_request: FastifyRequest, _reply: FastifyReply) => {
+      const users = await getAllUsersWithStats();
+      return {
+        data: users.map((u) => ({
+          id: u.id,
+          email: u.email,
+          createdAt: u.created_at,
+          lastLogin: u.last_login,
+          emailNotificationsOn: u.email_notifications_on === 1,
+          isTestUser: u.is_test_user === 1,
+          stripeCustomerId: u.stripe_customer_id,
+          activeSubscriptionCount: Number(u.active_subscription_count),
+          totalSubscriptionCount: Number(u.total_subscription_count),
+          estimatedMonthlySpendCents: Number(u.estimated_monthly_spend_cents),
+        })),
+      };
+    },
+  );
+
+  // Get single user with subscription details
+  fastify.get(
+    "/users/:userId",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { userId } = request.params as { userId: string };
+
+      const user = await getUserWithSubscriptions(userId);
+      if (!user) {
+        return reply.status(404).send({ error: "User not found" });
+      }
+
+      return {
+        data: {
+          id: user.id,
+          email: user.email,
+          createdAt: user.created_at,
+          lastLogin: user.last_login,
+          emailNotificationsOn: user.email_notifications_on === 1,
+          isTestUser: user.is_test_user === 1,
+          stripeCustomerId: user.stripe_customer_id,
+          activeSubscriptionCount: Number(user.active_subscription_count),
+          totalSubscriptionCount: Number(user.total_subscription_count),
+          estimatedMonthlySpendCents: Number(
+            user.estimated_monthly_spend_cents,
+          ),
+          subscriptions: user.subscriptions.map((s) => ({
+            id: s.id,
+            listId: s.list_id,
+            listName: s.list_name,
+            listLocation: s.list_location,
+            status: s.status,
+            priceCents: s.price_cents,
+            currency: s.currency,
+            currentPeriodEnd: s.current_period_end,
+            createdAt: s.created_at,
+            stripeSubscriptionId: s.stripe_subscription_id,
+          })),
+        },
+      };
+    },
+  );
+
+  // Toggle test user flag
+  fastify.patch(
+    "/users/:userId/test",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { userId } = request.params as { userId: string };
+      const { isTestUser } = request.body as { isTestUser: boolean };
+
+      if (typeof isTestUser !== "boolean") {
+        return reply
+          .status(400)
+          .send({ error: "isTestUser must be a boolean" });
+      }
+
+      await setUserTestStatus(userId, isTestUser);
+      return { data: { userId, isTestUser } };
+    },
+  );
+
+  // ============================================
+  // Platform Settings
+  // ============================================
+
+  // Get current settings
+  fastify.get(
+    "/settings",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (_request: FastifyRequest, _reply: FastifyReply) => {
+      const result = await db.execute(
+        "SELECT key, value FROM settings WHERE key = 'price_per_property_cents'",
+      );
+      const row = result.rows[0];
+      const pricePerPropertyCents = row
+        ? parseInt(row.value as string, 10)
+        : 100;
+      return { data: { pricePerPropertyCents } };
+    },
+  );
+
+  // Update settings
+  fastify.patch(
+    "/settings",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const validation = zodValidate(updateSettingsSchema, request.body);
+      if (!validation.success) {
+        return reply.status(400).send({ error: validation.error });
+      }
+
+      const { pricePerPropertyCents } = validation.data;
+
+      await db.execute({
+        sql: "INSERT INTO settings (key, value, updated_at) VALUES ('price_per_property_cents', ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        args: [String(pricePerPropertyCents)],
+      });
+
+      return { data: { pricePerPropertyCents } };
+    },
+  );
+
+  // Recalculate all list prices based on active property count
+  fastify.post(
+    "/settings/recalculate-prices",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (_request: FastifyRequest, _reply: FastifyReply) => {
+      // Read current price per property
+      const settingsResult = await db.execute(
+        "SELECT value FROM settings WHERE key = 'price_per_property_cents'",
+      );
+      const settingsRow = settingsResult.rows[0];
+      const pricePerPropertyCents = settingsRow
+        ? parseInt(settingsRow.value as string, 10)
+        : 100;
+
+      // Get all lists with their active property count
+      const listsResult = await db.execute(`
+        SELECT
+          l.id,
+          l.name,
+          l.price_cents AS old_price_cents,
+          COUNT(p.id) AS active_count
+        FROM lists l
+        LEFT JOIN properties p
+          ON p.list_id = l.id
+          AND (p.discontinued = 0 OR p.discontinued IS NULL)
+        GROUP BY l.id
+      `);
+
+      interface RecalcRow {
+        id: string;
+        name: string;
+        old_price_cents: number;
+        active_count: number;
+      }
+
+      const results: Array<{
+        listId: string;
+        listName: string;
+        oldPriceCents: number;
+        newPriceCents: number;
+        activePropertyCount: number;
+      }> = [];
+
+      for (const row of listsResult.rows as unknown as RecalcRow[]) {
+        const activeCount = Number(row.active_count);
+        const newPriceCents = activeCount * pricePerPropertyCents;
+
+        await db.execute({
+          sql: "UPDATE lists SET price_cents = ? WHERE id = ?",
+          args: [newPriceCents, row.id],
+        });
+
+        results.push({
+          listId: row.id,
+          listName: row.name,
+          oldPriceCents: Number(row.old_price_cents),
+          newPriceCents,
+          activePropertyCount: activeCount,
+        });
+      }
+
+      return { data: { pricePerPropertyCents, results } };
     },
   );
 }

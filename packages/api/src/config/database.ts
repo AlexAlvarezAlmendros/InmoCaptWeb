@@ -16,6 +16,26 @@ export async function runMigrations(): Promise<void> {
       sql: "ALTER TABLE properties ADD COLUMN discontinued INTEGER DEFAULT 0",
       description: "Add discontinued column to properties",
     },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT DEFAULT (datetime('now'))
+      )`,
+      description: "Create settings table",
+    },
+    {
+      sql: `INSERT OR IGNORE INTO settings (key, value) VALUES ('price_per_property_cents', '100')`,
+      description: "Seed default price_per_property_cents setting",
+    },
+    {
+      sql: "ALTER TABLE users ADD COLUMN last_login TEXT",
+      description: "Add last_login column to users",
+    },
+    {
+      sql: "ALTER TABLE users ADD COLUMN is_test_user INTEGER DEFAULT 0",
+      description: "Add is_test_user column to users",
+    },
   ];
 
   for (const migration of migrations) {

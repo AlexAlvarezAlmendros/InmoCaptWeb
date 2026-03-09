@@ -86,6 +86,12 @@ export const updateListSchema = z.object({
 
 export type UpdateListInput = z.infer<typeof updateListSchema>;
 
+export const updateSettingsSchema = z.object({
+  pricePerPropertyCents: z.number().int().min(0, "Price must be 0 or positive"),
+});
+
+export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
+
 export const createListSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   location: z.string().min(1, "Location is required").max(500),

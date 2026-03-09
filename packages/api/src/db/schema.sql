@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   email_notifications_on INTEGER DEFAULT 1,
   stripe_customer_id TEXT,  -- Stripe customer ID for billing
+  last_login TEXT,
+  is_test_user INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -79,6 +81,16 @@ CREATE TABLE IF NOT EXISTS list_updates (
   updated_at TEXT DEFAULT (datetime('now')),
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Settings table (platform configuration key-value store)
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Default platform settings
+INSERT OR IGNORE INTO settings (key, value) VALUES ('price_per_property_cents', '100');
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_properties_list_id ON properties(list_id);

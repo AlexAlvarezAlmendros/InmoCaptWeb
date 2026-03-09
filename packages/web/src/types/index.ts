@@ -203,3 +203,53 @@ export interface BulkDiscontinueResult {
   notFound: string[];
   affectedListIds: string[];
 }
+
+// Admin settings
+export interface AdminSettings {
+  pricePerPropertyCents: number;
+}
+
+// Price recalculation result per list
+export interface PriceRecalculateResult {
+  listId: string;
+  listName: string;
+  oldPriceCents: number;
+  newPriceCents: number;
+  activePropertyCount: number;
+}
+
+export interface RecalculatePricesResponse {
+  pricePerPropertyCents: number;
+  results: PriceRecalculateResult[];
+}
+
+// Admin user types
+export interface AdminUser {
+  id: string;
+  email: string;
+  createdAt: string;
+  lastLogin: string | null;
+  emailNotificationsOn: boolean;
+  isTestUser: boolean;
+  stripeCustomerId: string | null;
+  activeSubscriptionCount: number;
+  totalSubscriptionCount: number;
+  estimatedMonthlySpendCents: number;
+}
+
+export interface AdminUserSubscription {
+  id: string;
+  listId: string;
+  listName: string;
+  listLocation: string;
+  status: SubscriptionStatus;
+  priceCents: number;
+  currency: string;
+  currentPeriodEnd: string | null;
+  createdAt: string;
+  stripeSubscriptionId: string | null;
+}
+
+export interface AdminUserDetail extends AdminUser {
+  subscriptions: AdminUserSubscription[];
+}

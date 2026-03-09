@@ -6,6 +6,8 @@ import { SubscriptionsPage } from "@/pages/Subscriptions";
 import { AccountPage } from "@/pages/Account";
 import { AdminListsPage } from "@/pages/admin/Lists";
 import { AdminRequestsPage } from "@/pages/admin/Requests";
+import { AdminConfigPage } from "@/pages/admin/Config";
+import { AdminUsersPage } from "@/pages/admin/Users";
 import {
   PrivacyPolicyPage,
   TermsPage,
@@ -57,6 +59,8 @@ export function AppRouter() {
         <Route index element={<AdminListsPage />} />
         <Route path="lists" element={<AdminListsPage />} />
         <Route path="requests" element={<AdminRequestsPage />} />
+        <Route path="config" element={<AdminConfigPage />} />
+        <Route path="users" element={<AdminUsersPage />} />
       </Route>
     </Routes>
   );

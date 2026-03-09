@@ -70,7 +70,7 @@ async function initDatabase() {
       await db.execute(statement);
     }
 
-    console.log("\n✅ Database initialized successfully!");
+    console.log("\n✅ Database initialized successfully!\n");
 
     // Verify tables were created
     const tables = await db.execute(

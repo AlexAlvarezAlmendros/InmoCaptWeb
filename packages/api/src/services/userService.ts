@@ -99,8 +99,10 @@ export async function ensureUserExists(authUser: AuthUser): Promise<DbUser> {
     id: authUser.sub,
     email: authUser.email || "",
     created_at: now,
+    last_login: now,
     email_notifications_on: 1,
     stripe_customer_id: null,
+    is_test_user: 0,
   };
 }
 

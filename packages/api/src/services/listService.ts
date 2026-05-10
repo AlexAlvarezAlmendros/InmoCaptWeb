@@ -135,6 +135,102 @@ export async function getAvailableListsForUser(
   }));
 }
 
+export interface UserListCard {
+  id: string;
+  name: string;
+  location: string;
+  totalProperties: number;
+  newPropertiesCount: number;
+  lastUpdatedAt: string;
+}
+
+/**
+ * Full catalog of lists (v2) with stats, excluding those the user already
+ * has access to via user_list_access.
+ */
+export async function getCatalogListsForUser(
+  userId: string,
+): Promise<ListWithStats[]> {
+  const result = await db.execute({
+    sql: `
+      SELECT
+        l.id,
+        l.name,
+        l.location,
+        l.price_cents as priceCents,
+        l.currency,
+        l.last_updated_at as lastUpdatedAt,
+        l.created_at as createdAt,
+        COALESCE(prop_count.count, 0) as totalProperties,
+        0 as subscriberCount
+      FROM lists l
+      LEFT JOIN (
+        SELECT list_id, COUNT(*) as count
+        FROM properties
+        WHERE discontinued = 0 OR discontinued IS NULL
+        GROUP BY list_id
+      ) prop_count ON l.id = prop_count.list_id
+      WHERE l.id NOT IN (
+        SELECT list_id FROM user_list_access WHERE user_id = ?
+      )
+      ORDER BY l.name ASC
+    `,
+    args: [userId],
+  });
+
+  return result.rows.map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    location: row.location as string,
+    priceCents: row.priceCents as number,
+    currency: row.currency as string,
+    lastUpdatedAt: row.lastUpdatedAt as string,
+    createdAt: row.createdAt as string,
+    subscriberCount: 0,
+    totalProperties: Number(row.totalProperties),
+  }));
+}
+
+/**
+ * Lists the user currently has v2 access to, with stats for the Dashboard.
+ */
+export async function getUserAccessedListsWithStats(
+  userId: string,
+): Promise<UserListCard[]> {
+  const result = await db.execute({
+    sql: `
+      SELECT
+        l.id,
+        l.name,
+        l.location,
+        l.last_updated_at as lastUpdatedAt,
+        (SELECT COUNT(*) FROM properties
+          WHERE list_id = l.id AND (discontinued = 0 OR discontinued IS NULL)
+        ) as totalProperties,
+        COALESCE(
+          (SELECT added_count FROM list_updates
+            WHERE list_id = l.id
+            ORDER BY created_at DESC LIMIT 1),
+          0
+        ) as newPropertiesCount
+      FROM user_list_access ula
+      JOIN lists l ON l.id = ula.list_id
+      WHERE ula.user_id = ?
+      ORDER BY l.name ASC
+    `,
+    args: [userId],
+  });
+
+  return result.rows.map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    location: row.location as string,
+    lastUpdatedAt: row.lastUpdatedAt as string,
+    totalProperties: Number(row.totalProperties),
+    newPropertiesCount: Number(row.newPropertiesCount),
+  }));
+}
+
 /**
  * Get a single list by ID
  */

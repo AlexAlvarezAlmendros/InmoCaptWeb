@@ -114,10 +114,97 @@ export interface Property {
   state: PropertyState;
   comment: string | null;
   stateUpdatedAt: string | null;
+  // v2: credit-gated contact reveal
+  isRevealed?: boolean;
   // Extracted from rawPayload (Idealista)
   title?: string;
   location?: string;
   description?: string;
+}
+
+// v2 — Plans, credits, reveals
+
+export interface Plan {
+  id: string;
+  name: string;
+  priceCents: number;
+  currency: string;
+  maxLists: number | null;
+  monthlyCredits: number;
+}
+
+export type PlanStatus = "active" | "canceling" | "canceled" | "past_due" | "expired";
+
+export interface PendingListChange {
+  id: string;
+  action: "add" | "remove" | "swap";
+  listId: string;
+  replaceListId: string | null;
+  applyAt: string;
+  createdAt: string;
+}
+
+export interface CreditBalance {
+  planCredits: number;
+  topupCredits: number;
+  total: number;
+}
+
+export interface UserPlanData {
+  planId: string;
+  planName: string;
+  status: PlanStatus;
+  isActive: boolean;
+  maxLists: number | null;
+  monthlyCredits: number;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  stripeSubscriptionId: string | null;
+  pendingPlanId: string | null;
+  credits: CreditBalance;
+  listAccess: string[];
+  pendingListChanges: PendingListChange[];
+}
+
+export interface CreditPack {
+  id: string;
+  name: string;
+  credits: number;
+  priceCents: number;
+  currency: string;
+}
+
+export type CreditTxType =
+  | "grant_plan"
+  | "grant_topup"
+  | "spend_reveal"
+  | "expire"
+  | "refund"
+  | "admin_adjust";
+
+export interface CreditTransaction {
+  id: string;
+  type: CreditTxType;
+  amount: number;
+  bucket: "plan" | "topup";
+  balancePlanAfter: number;
+  balanceTopupAfter: number;
+  relatedPropertyId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface RevealResponseData {
+  success: boolean;
+  alreadyRevealed?: boolean;
+  bucket?: "plan" | "topup" | null;
+  balance?: CreditBalance;
+  contact?: {
+    phone: string | null;
+    sourceUrl: string | null;
+    ownerName: string | null;
+  };
+  reason?: "property_not_found" | "no_list_access" | "no_credits";
 }
 
 // Subscription types

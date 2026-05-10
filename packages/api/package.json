@@ -8,6 +8,7 @@
 		"build": "tsc",
 		"start": "node dist/server.js",
 		"db:init": "tsx src/initDb.ts",
+		"stripe:seed": "tsx src/stripeSeed.ts",
 		"lint": "eslint . --ext ts --report-unused-disable-directives --max-warnings 0",
 		"typecheck": "tsc --noEmit"
 	},

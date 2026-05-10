@@ -33,7 +33,6 @@ export function AdminRequestsPage() {
 
   // Form state for approval
   const [listName, setListName] = useState("");
-  const [listPrice, setListPrice] = useState("4900");
 
   // Data fetching
   const {
@@ -50,7 +49,6 @@ export function AdminRequestsPage() {
   const handleOpenApprove = (request: AdminListRequest) => {
     setApprovingRequest(request);
     setListName(`${request.location}`);
-    setListPrice("4900");
   };
 
   const handleApprove = async () => {
@@ -60,14 +58,13 @@ export function AdminRequestsPage() {
       requestId: approvingRequest.id,
       data: {
         name: listName,
-        priceCents: parseInt(listPrice, 10) || 4900,
+        priceCents: 0,
         currency: "EUR",
       },
     });
 
     setApprovingRequest(null);
     setListName("");
-    setListPrice("4900");
   };
 
   const handleReject = async () => {
@@ -293,21 +290,6 @@ export function AdminRequestsPage() {
               onChange={(e) => setListName(e.target.value)}
               placeholder="Madrid Centro"
             />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Precio mensual (céntimos)
-            </label>
-            <Input
-              type="number"
-              value={listPrice}
-              onChange={(e) => setListPrice(e.target.value)}
-              placeholder="4900"
-            />
-            <p className="mt-1 text-xs text-slate-500">
-              = €{(parseInt(listPrice, 10) / 100 || 0).toFixed(2)}/mes
-            </p>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

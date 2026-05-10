@@ -29,6 +29,10 @@ import {
   rejectListRequest,
 } from "../services/listRequestService.js";
 import {
+  getAllPlansIncludingTrial,
+  getPlanById,
+} from "../services/planService.js";
+import {
   createListSchema,
   updateListSchema,
   updateSettingsSchema,
@@ -550,6 +554,160 @@ export async function adminRoutes(fastify: FastifyInstance) {
       }
 
       return { data: { pricePerPropertyCents, results } };
+    },
+  );
+
+  // ============================================
+  // Plans Management (v2)
+  // ============================================
+
+  fastify.get(
+    "/plans",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (_request, _reply) => {
+      const plans = await getAllPlansIncludingTrial();
+      return { data: plans };
+    },
+  );
+
+  fastify.patch(
+    "/plans/:planId",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (request, reply) => {
+      const { planId } = request.params as { planId: string };
+      const body = request.body as {
+        name?: string;
+        priceCents?: number;
+        maxLists?: number | null;
+        monthlyCredits?: number;
+        trialDurationDays?: number | null;
+        active?: boolean;
+        sortOrder?: number;
+      };
+
+      const plan = await getPlanById(planId);
+      if (!plan) return reply.code(404).send({ error: "Plan not found" });
+
+      const fields: string[] = [];
+      const args: (string | number | null)[] = [];
+      if (body.name !== undefined) {
+        fields.push("name = ?");
+        args.push(body.name);
+      }
+      if (body.priceCents !== undefined) {
+        fields.push("price_cents = ?");
+        args.push(body.priceCents);
+      }
+      if (body.maxLists !== undefined) {
+        fields.push("max_lists = ?");
+        args.push(body.maxLists);
+      }
+      if (body.monthlyCredits !== undefined) {
+        fields.push("monthly_credits = ?");
+        args.push(body.monthlyCredits);
+      }
+      if (body.trialDurationDays !== undefined) {
+        fields.push("trial_duration_days = ?");
+        args.push(body.trialDurationDays);
+      }
+      if (body.active !== undefined) {
+        fields.push("active = ?");
+        args.push(body.active ? 1 : 0);
+      }
+      if (body.sortOrder !== undefined) {
+        fields.push("sort_order = ?");
+        args.push(body.sortOrder);
+      }
+
+      if (fields.length === 0) {
+        return reply.code(400).send({ error: "No fields to update" });
+      }
+
+      args.push(planId);
+      await db.execute({
+        sql: `UPDATE plans SET ${fields.join(", ")} WHERE id = ?`,
+        args,
+      });
+
+      const updated = await getPlanById(planId);
+      return { data: updated };
+    },
+  );
+
+  // ============================================
+  // Credit Packs Management (v2)
+  // ============================================
+
+  fastify.get(
+    "/credit-packs",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (_request, _reply) => {
+      const result = await db.execute(
+        "SELECT * FROM credit_packs ORDER BY sort_order ASC",
+      );
+      return { data: result.rows };
+    },
+  );
+
+  fastify.patch(
+    "/credit-packs/:packId",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (request, reply) => {
+      const { packId } = request.params as { packId: string };
+      const body = request.body as {
+        name?: string;
+        credits?: number;
+        priceCents?: number;
+        active?: boolean;
+        sortOrder?: number;
+      };
+
+      const existing = await db.execute({
+        sql: "SELECT id FROM credit_packs WHERE id = ?",
+        args: [packId],
+      });
+      if (existing.rows.length === 0) {
+        return reply.code(404).send({ error: "Pack not found" });
+      }
+
+      const fields: string[] = [];
+      const args: (string | number)[] = [];
+      if (body.name !== undefined) {
+        fields.push("name = ?");
+        args.push(body.name);
+      }
+      if (body.credits !== undefined) {
+        fields.push("credits = ?");
+        args.push(body.credits);
+      }
+      if (body.priceCents !== undefined) {
+        fields.push("price_cents = ?");
+        args.push(body.priceCents);
+      }
+      if (body.active !== undefined) {
+        fields.push("active = ?");
+        args.push(body.active ? 1 : 0);
+      }
+      if (body.sortOrder !== undefined) {
+        fields.push("sort_order = ?");
+        args.push(body.sortOrder);
+      }
+
+      if (fields.length === 0) {
+        return reply.code(400).send({ error: "No fields to update" });
+      }
+
+      args.push(packId);
+      await db.execute({
+        sql: `UPDATE credit_packs SET ${fields.join(", ")} WHERE id = ?`,
+        args,
+      });
+
+      const updated = await db.execute({
+        sql: "SELECT * FROM credit_packs WHERE id = ?",
+        args: [packId],
+      });
+      return { data: updated.rows[0] };
     },
   );
 }

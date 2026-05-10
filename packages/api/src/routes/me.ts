@@ -10,6 +10,15 @@ import {
   updateSubscriptionByStripeId,
   getAllUserSubscriptions,
 } from "../services/subscriptionService.js";
+import { getUserAccessedListsWithStats } from "../services/listService.js";
+import {
+  getUserPlanWithDefinition,
+  getUserListAccessIds,
+  getPendingListChanges,
+  cancelPendingListChange,
+  setPlanPeriodEnd,
+} from "../services/planService.js";
+import { getBalance } from "../services/creditService.js";
 import { stripe } from "../config/stripe.js";
 import { env } from "../config/env.js";
 import { zodValidate, updatePreferencesSchema } from "../schemas/validation.js";
@@ -87,6 +96,120 @@ export async function meRoutes(fastify: FastifyInstance) {
       );
 
       return { data: enriched };
+    },
+  );
+
+  // v2: lists the user has chosen via their plan (user_list_access)
+  fastify.get(
+    "/lists",
+    { preHandler: [authenticate] },
+    async (request, _reply) => {
+      await ensureUserExists(request.user);
+      const lists = await getUserAccessedListsWithStats(request.user.sub);
+      return { data: lists };
+    },
+  );
+
+  // Current plan (v2) — unified endpoint for dashboard header / plan page
+  fastify.get(
+    "/plan",
+    { preHandler: [authenticate] },
+    async (request, _reply) => {
+      await ensureUserExists(request.user);
+      const userId = request.user.sub;
+
+      let userPlan = await getUserPlanWithDefinition(userId);
+      if (!userPlan) {
+        return { data: null };
+      }
+
+      // Self-healing: keep DB in sync with Stripe when webhooks miss.
+      const stripeSubId = userPlan.subscription.stripe_subscription_id;
+      const subStatus = userPlan.subscription.status;
+      const periodEnd = userPlan.subscription.current_period_end;
+      const isPaidPlan = userPlan.plan.id !== "trial";
+
+      if (stripeSubId && isPaidPlan) {
+        const periodExpired =
+          periodEnd && new Date(periodEnd) < new Date();
+
+        if (subStatus === "canceling" && periodExpired) {
+          // Period ended on a canceling subscription — no webhook needed, just expire it
+          await setPlanPeriodEnd(stripeSubId, null, "canceled");
+          userPlan = (await getUserPlanWithDefinition(userId))!;
+        } else if (userPlan.isActive) {
+          // Active plan: verify against Stripe to catch missed webhooks
+          try {
+            const stripeSub = await stripe.subscriptions.retrieve(stripeSubId);
+            if (
+              stripeSub.status === "canceled" ||
+              stripeSub.status === "unpaid"
+            ) {
+              await setPlanPeriodEnd(stripeSubId, null, "canceled");
+              userPlan = (await getUserPlanWithDefinition(userId))!;
+            } else if (
+              stripeSub.cancel_at_period_end &&
+              !stripeSub.metadata?.pendingPlanId
+            ) {
+              const newPeriodEnd = stripeSub.current_period_end
+                ? new Date(stripeSub.current_period_end * 1000).toISOString()
+                : null;
+              await setPlanPeriodEnd(stripeSubId, newPeriodEnd, "canceling");
+              userPlan = (await getUserPlanWithDefinition(userId))!;
+            }
+          } catch (err: unknown) {
+            const e = err as { statusCode?: number; code?: string };
+            if (e?.statusCode === 404 || e?.code === "resource_missing") {
+              await setPlanPeriodEnd(stripeSubId, null, "canceled");
+              userPlan = (await getUserPlanWithDefinition(userId))!;
+            }
+            // Other Stripe errors: silently continue with DB data
+          }
+        }
+      }
+
+      const [balance, lists, pending] = await Promise.all([
+        getBalance(userId),
+        getUserListAccessIds(userId),
+        getPendingListChanges(userId),
+      ]);
+
+      return {
+        data: {
+          planId: userPlan.plan.id,
+          planName: userPlan.plan.name,
+          status: userPlan.subscription.status,
+          isActive: userPlan.isActive,
+          maxLists: userPlan.plan.max_lists,
+          monthlyCredits: userPlan.plan.monthly_credits,
+          currentPeriodStart: userPlan.subscription.current_period_start,
+          currentPeriodEnd: userPlan.subscription.current_period_end,
+          stripeSubscriptionId: userPlan.subscription.stripe_subscription_id,
+          pendingPlanId: userPlan.subscription.pending_plan_id ?? null,
+          credits: balance,
+          listAccess: lists,
+          pendingListChanges: pending.map((p) => ({
+            id: p.id,
+            action: p.action,
+            listId: p.list_id,
+            replaceListId: p.replace_list_id,
+            applyAt: p.apply_at,
+            createdAt: p.created_at,
+          })),
+        },
+      };
+    },
+  );
+
+  // Cancel a pending list change
+  fastify.delete(
+    "/pending-list-changes/:id",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const ok = await cancelPendingListChange(request.user.sub, id);
+      if (!ok) return reply.code(404).send({ error: "Not found" });
+      return { success: true };
     },
   );
 

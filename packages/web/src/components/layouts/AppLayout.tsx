@@ -1,9 +1,43 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, Link } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import { Button } from "@/components/ui";
 import { useUserRoles } from "@/hooks/useUserRoles";
+import { useUserPlan } from "@/hooks/usePlan";
 import { useSEO } from "@/hooks/useSEO";
 import { useState } from "react";
+
+function PlanBadge({ className = "" }: { className?: string }) {
+  const { data: userPlan, isLoading } = useUserPlan();
+  if (isLoading || !userPlan) return null;
+
+  const isTrial = userPlan.planId === "trial";
+  const isInactive = !userPlan.isActive;
+
+  const tone = isInactive
+    ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+    : isTrial
+      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+      : "bg-primary/10 text-primary dark:bg-primary/20 dark:text-white";
+
+  return (
+    <Link
+      to="/app/plans"
+      title={`${userPlan.credits.total} créditos disponibles`}
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-base hover:opacity-80 ${tone} ${className}`}
+    >
+      {userPlan.planName}
+      <span className="opacity-60">·</span>
+      <span>{userPlan.credits.total}</span>
+      <svg
+        className="h-3 w-3 opacity-70"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+      >
+        <path d="M11.3 1.046A1 1 0 0 1 12 2v5h4a1 1 0 0 1 .82 1.573l-7 10A1 1 0 0 1 8 18v-5H4a1 1 0 0 1-.82-1.573l7-10a1 1 0 0 1 1.12-.38z" />
+      </svg>
+    </Link>
+  );
+}
 
 export function AppLayout() {
   const { logout, user } = useAuth0();
@@ -50,8 +84,11 @@ export function AppLayout() {
               <NavLink to="/app/dashboard" className={navLinkClass}>
                 Dashboard
               </NavLink>
-              <NavLink to="/app/subscriptions" className={navLinkClass}>
-                Suscripciones
+              <NavLink to="/app/plans" className={navLinkClass}>
+                Planes
+              </NavLink>
+              <NavLink to="/app/credits" className={navLinkClass}>
+                Créditos
               </NavLink>
               <NavLink to="/app/account" className={navLinkClass}>
                 Cuenta
@@ -66,6 +103,7 @@ export function AppLayout() {
 
           {/* User menu + mobile hamburger */}
           <div className="flex items-center gap-3">
+            <PlanBadge className="hidden sm:inline-flex" />
             <span className="hidden text-sm text-slate-600 dark:text-slate-400 sm:block">
               {user?.email}
             </span>
@@ -129,11 +167,18 @@ export function AppLayout() {
                 Dashboard
               </NavLink>
               <NavLink
-                to="/app/subscriptions"
+                to="/app/plans"
                 className={mobileNavLinkClass}
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Suscripciones
+                Planes
+              </NavLink>
+              <NavLink
+                to="/app/credits"
+                className={mobileNavLinkClass}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Créditos
               </NavLink>
               <NavLink
                 to="/app/account"
@@ -152,6 +197,9 @@ export function AppLayout() {
                 </NavLink>
               )}
               <div className="mt-2 border-t border-border-light pt-3 dark:border-border-dark">
+                <div className="mb-2 px-3">
+                  <PlanBadge />
+                </div>
                 <p className="mb-2 truncate px-3 text-xs text-slate-400">
                   {user?.email}
                 </p>

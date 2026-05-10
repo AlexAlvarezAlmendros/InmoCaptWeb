@@ -23,6 +23,17 @@ import {
   sendSubscriptionActivatedEmail,
   sendSubscriptionCancelledEmail,
 } from "../services/emailService.js";
+import {
+  getPlanById,
+  upsertPaidPlanSubscription,
+  setPlanPeriodEnd,
+  applyPendingListChanges,
+} from "../services/planService.js";
+import {
+  grantTopupCredits,
+  resetPlanCredits,
+} from "../services/creditService.js";
+import { db } from "../config/database.js";
 
 export async function billingRoutes(fastify: FastifyInstance) {
   // Create checkout session for subscribing to a list
@@ -161,8 +172,6 @@ export async function billingRoutes(fastify: FastifyInstance) {
       }
 
       try {
-        // Create a portal configuration that cancels immediately
-        // (business rule: cancellation = immediate loss of access)
         const portalConfig = await stripe.billingPortal.configurations.create({
           business_profile: {
             headline: "Gestiona tus suscripciones",
@@ -170,7 +179,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
           features: {
             subscription_cancel: {
               enabled: true,
-              mode: "immediately",
+              mode: "at_period_end",
               proration_behavior: "none",
             },
             payment_method_update: { enabled: true },
@@ -180,7 +189,7 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
         const session = await stripe.billingPortal.sessions.create({
           customer: stripeCustomerId,
-          return_url: `${env.FRONTEND_URL}/app/subscriptions?portal=returned`,
+          return_url: `${env.FRONTEND_URL}/app/account`,
           configuration: portalConfig.id,
         });
 
@@ -366,6 +375,17 @@ export async function billingRoutes(fastify: FastifyInstance) {
           .send({ error: "Webhook signature verification failed" });
       }
 
+      // Idempotency: has this stripe id already produced a credit transaction?
+      async function stripeEventAlreadyProcessed(
+        stripeId: string,
+      ): Promise<boolean> {
+        const r = await db.execute({
+          sql: "SELECT 1 FROM credit_transactions WHERE related_stripe_id = ? LIMIT 1",
+          args: [stripeId],
+        });
+        return r.rows.length > 0;
+      }
+
       // Helper: resolve userId and listId from a Stripe subscription
       // Checks metadata, then customer lookup, then product metadata, then canceled sub fallback
       async function resolveSubscriptionOwnership(
@@ -426,8 +446,86 @@ export async function billingRoutes(fastify: FastifyInstance) {
           const session = event.data.object as Stripe.Checkout.Session;
           const userId = session.metadata?.userId;
           const listId = session.metadata?.listId;
+          const planId = session.metadata?.planId;
+          const packId = session.metadata?.packId;
           const subscriptionId = session.subscription as string;
           const customerId = session.customer as string;
+
+          // New: v2 plan subscription checkout
+          if (userId && planId && subscriptionId) {
+            const plan = await getPlanById(planId);
+            if (!plan) {
+              fastify.log.error(
+                `Checkout completed for unknown planId: ${planId}`,
+              );
+              break;
+            }
+
+            const subscription =
+              await stripe.subscriptions.retrieve(subscriptionId);
+            const periodStart = subscription.current_period_start
+              ? new Date(
+                  subscription.current_period_start * 1000,
+                ).toISOString()
+              : null;
+            const periodEnd = subscription.current_period_end
+              ? new Date(subscription.current_period_end * 1000).toISOString()
+              : null;
+
+            await upsertPaidPlanSubscription({
+              userId,
+              planId,
+              stripeSubscriptionId: subscriptionId,
+              stripeCustomerId: customerId,
+              status: "active",
+              currentPeriodStart: periodStart,
+              currentPeriodEnd: periodEnd,
+            });
+
+            if (!(await stripeEventAlreadyProcessed(session.id))) {
+              await resetPlanCredits({
+                userId,
+                newAmount: plan.monthly_credits,
+                relatedStripeId: session.id,
+                note: "plan_checkout",
+              });
+            }
+
+            await applyPendingListChanges(userId);
+
+            fastify.log.info(
+              `Plan subscription activated: user=${userId}, plan=${planId}, stripeSub=${subscriptionId}`,
+            );
+            break;
+          }
+
+          // New: v2 credit pack one-off checkout
+          if (userId && packId && session.mode === "payment") {
+            if (await stripeEventAlreadyProcessed(session.id)) {
+              fastify.log.info(
+                `Credit pack session already processed: ${session.id}`,
+              );
+              break;
+            }
+            const creditsStr = session.metadata?.credits;
+            const credits = creditsStr ? parseInt(creditsStr, 10) : NaN;
+            if (!Number.isFinite(credits) || credits <= 0) {
+              fastify.log.error(
+                `Invalid credits metadata in pack checkout: ${creditsStr}`,
+              );
+              break;
+            }
+            await grantTopupCredits({
+              userId,
+              amount: credits,
+              relatedStripeId: session.id,
+              packId,
+            });
+            fastify.log.info(
+              `Credit pack granted: user=${userId}, pack=${packId}, credits=${credits}`,
+            );
+            break;
+          }
 
           if (userId && listId && subscriptionId) {
             // Get subscription details from Stripe
@@ -483,6 +581,15 @@ export async function billingRoutes(fastify: FastifyInstance) {
 
         case "customer.subscription.created": {
           const subscription = event.data.object as Stripe.Subscription;
+
+          // v2 plan subscriptions are handled by checkout.session.completed or
+          // by the customer.subscription.deleted handler (downgrade activation)
+          if (subscription.metadata?.planId) {
+            fastify.log.info(
+              `subscription.created for plan sub ${subscription.id} — handled elsewhere`,
+            );
+            break;
+          }
 
           // Skip if this came from a checkout session (handled by checkout.session.completed)
           if (subscription.metadata?.userId && subscription.metadata?.listId) {
@@ -546,6 +653,28 @@ export async function billingRoutes(fastify: FastifyInstance) {
             status = "past_due";
           }
 
+          // v2 plan subscription branch: route to user_plan_subscriptions
+          if (subscription.metadata?.planId) {
+            let effectiveStatus: string;
+            if (
+              subscription.cancel_at_period_end &&
+              subscription.metadata?.pendingPlanId
+            ) {
+              // Downgrade scheduled — keep active so user doesn't lose access
+              effectiveStatus = "active";
+            } else if (subscription.cancel_at_period_end) {
+              // Cancelled via portal or cancel button — active until period end
+              effectiveStatus = "canceling";
+            } else {
+              effectiveStatus = status;
+            }
+            await setPlanPeriodEnd(subscription.id, periodEnd, effectiveStatus);
+            fastify.log.info(
+              `Plan subscription ${subscription.id} updated: status=${effectiveStatus}`,
+            );
+            break;
+          }
+
           const rowsAffected = await updateSubscriptionByStripeId({
             stripeSubscriptionId: subscription.id,
             status,
@@ -583,6 +712,79 @@ export async function billingRoutes(fastify: FastifyInstance) {
         case "customer.subscription.deleted": {
           const subscription = event.data.object as Stripe.Subscription;
 
+          // v2 plan subscription branch
+          if (subscription.metadata?.planId) {
+            const pendingPlanId = subscription.metadata?.pendingPlanId;
+            const subUserId = subscription.metadata?.userId;
+
+            if (pendingPlanId && subUserId) {
+              // This was a scheduled downgrade — activate the new (lower) plan
+              const newPlan = await getPlanById(pendingPlanId);
+              const customerId = subscription.customer as string;
+
+              if (newPlan?.stripe_price_id) {
+                try {
+                  const newSub = await stripe.subscriptions.create({
+                    customer: customerId,
+                    items: [{ price: newPlan.stripe_price_id }],
+                    metadata: { userId: subUserId, planId: newPlan.id },
+                  });
+
+                  const newPeriodStart = newSub.current_period_start
+                    ? new Date(newSub.current_period_start * 1000).toISOString()
+                    : null;
+                  const newPeriodEnd = newSub.current_period_end
+                    ? new Date(newSub.current_period_end * 1000).toISOString()
+                    : null;
+
+                  await upsertPaidPlanSubscription({
+                    userId: subUserId,
+                    planId: newPlan.id,
+                    stripeSubscriptionId: newSub.id,
+                    stripeCustomerId: customerId,
+                    status: "active",
+                    currentPeriodStart: newPeriodStart,
+                    currentPeriodEnd: newPeriodEnd,
+                  });
+
+                  if (!(await stripeEventAlreadyProcessed(subscription.id))) {
+                    await resetPlanCredits({
+                      userId: subUserId,
+                      newAmount: newPlan.monthly_credits,
+                      relatedStripeId: subscription.id,
+                      note: "plan_downgrade_activated",
+                    });
+                  }
+
+                  await applyPendingListChanges(subUserId);
+
+                  fastify.log.info(
+                    `Plan downgrade activated: user=${subUserId}, newPlan=${pendingPlanId}, newSub=${newSub.id}`,
+                  );
+                } catch (err) {
+                  fastify.log.error(
+                    { err },
+                    `Failed to activate downgraded plan for user=${subUserId}, pendingPlan=${pendingPlanId}`,
+                  );
+                  // Mark as canceled so the user isn't left in a broken state
+                  await setPlanPeriodEnd(subscription.id, null, "canceled");
+                }
+              } else {
+                fastify.log.error(
+                  `Pending plan ${pendingPlanId} not found or has no stripe_price_id`,
+                );
+                await setPlanPeriodEnd(subscription.id, null, "canceled");
+              }
+            } else {
+              // Regular cancellation
+              const rows = await setPlanPeriodEnd(subscription.id, null, "canceled");
+              fastify.log.info(
+                `Plan subscription ${subscription.id} deleted (rows=${rows})`,
+              );
+            }
+            break;
+          }
+
           // Get subscription info before cancelling to send email
           const subRecord = await getSubscriptionByStripeId(subscription.id);
           let cancelledListName: string | null = null;
@@ -617,6 +819,63 @@ export async function billingRoutes(fastify: FastifyInstance) {
           }
 
           fastify.log.info(`Subscription ${subscription.id} canceled`);
+          break;
+        }
+
+        case "invoice.payment_succeeded": {
+          const invoice = event.data.object as Stripe.Invoice;
+          const subscriptionId = invoice.subscription as string | null;
+          const billingReason = invoice.billing_reason;
+
+          // Only act on renewals — initial payment is handled by checkout.session.completed
+          if (
+            !subscriptionId ||
+            (billingReason !== "subscription_cycle" &&
+              billingReason !== "subscription_update")
+          ) {
+            break;
+          }
+
+          const subscription =
+            await stripe.subscriptions.retrieve(subscriptionId);
+          const planId = subscription.metadata?.planId;
+          const userId = subscription.metadata?.userId;
+
+          if (!planId || !userId) break;
+
+          const plan = await getPlanById(planId);
+          if (!plan) {
+            fastify.log.error(
+              `invoice.payment_succeeded for unknown planId: ${planId}`,
+            );
+            break;
+          }
+
+          const periodEnd = subscription.current_period_end
+            ? new Date(subscription.current_period_end * 1000).toISOString()
+            : null;
+          await setPlanPeriodEnd(subscriptionId, periodEnd, "active");
+
+          // Only reset credits on monthly renewals. Upgrade proration invoices
+          // (subscription_update) are charged mid-cycle; credits were already
+          // added by addPlanCredits() in the change-plan endpoint, so resetting
+          // here would erase them.
+          if (billingReason === "subscription_cycle") {
+            if (!(await stripeEventAlreadyProcessed(invoice.id))) {
+              await resetPlanCredits({
+                userId,
+                newAmount: plan.monthly_credits,
+                relatedStripeId: invoice.id,
+                note: "plan_renewal",
+              });
+            }
+          }
+
+          await applyPendingListChanges(userId);
+
+          fastify.log.info(
+            `Plan invoice paid: user=${userId}, plan=${planId}, invoice=${invoice.id}, reason=${billingReason}`,
+          );
           break;
         }
 

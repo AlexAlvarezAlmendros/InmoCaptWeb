@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { meRoutes } from "./me.js";
 import { listsRoutes } from "./lists.js";
 import { billingRoutes } from "./billing.js";
+import { plansRoutes } from "./plans.js";
+import { creditsRoutes } from "./credits.js";
 import { adminRoutes } from "./admin.js";
 import { listRequestsRoutes } from "./listRequests.js";
 import { automationRoutes } from "./automation.js";
@@ -13,8 +15,14 @@ export async function registerRoutes(fastify: FastifyInstance) {
   // Lists routes
   await fastify.register(listsRoutes, { prefix: "/api/lists" });
 
-  // Billing routes
+  // Billing routes (legacy per-list + webhook)
   await fastify.register(billingRoutes, { prefix: "/api/billing" });
+
+  // Plans (v2 subscription model)
+  await fastify.register(plansRoutes, { prefix: "/api/plans" });
+
+  // Credits (top-ups + balance)
+  await fastify.register(creditsRoutes, { prefix: "/api/credits" });
 
   // List requests routes
   await fastify.register(listRequestsRoutes, { prefix: "/api/list-requests" });

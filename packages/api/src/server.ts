@@ -6,6 +6,7 @@ import rateLimit from "@fastify/rate-limit";
 import { env } from "./config/env.js";
 import { ensureSystemUser, runMigrations } from "./config/database.js";
 import { registerRoutes } from "./routes/index.js";
+import { startTrialExpirationJob } from "./services/trialExpirationJob.js";
 
 // Extend FastifyRequest to include rawBody
 declare module "fastify" {
@@ -90,6 +91,14 @@ export async function buildApp() {
 
   // Ensure system user exists for automation uploads
   await ensureSystemUser();
+
+  // Background jobs (only in non-serverless runtime)
+  if (process.env.VERCEL !== "1") {
+    startTrialExpirationJob({
+      info: (msg) => fastify.log.info(msg),
+      error: (err) => fastify.log.error(err),
+    });
+  }
 
   // Health check
   fastify.get("/health", async () => {

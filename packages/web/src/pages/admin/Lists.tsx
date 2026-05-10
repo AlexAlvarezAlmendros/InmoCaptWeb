@@ -5,7 +5,7 @@ import {
   UploadPropertiesModal,
   UploadDiscontinuedModal,
 } from "@/components/admin";
-import { formatPrice, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import {
   useAdminLists,
   useCreateList,
@@ -180,9 +180,6 @@ export function AdminListsPage() {
                   Ubicación
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Precio
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                   Suscriptores
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
@@ -205,9 +202,6 @@ export function AdminListsPage() {
                   <td className="px-4 py-4 font-medium">{list.name}</td>
                   <td className="px-4 py-4 text-slate-600 dark:text-slate-400">
                     {list.location}
-                  </td>
-                  <td className="px-4 py-4">
-                    {formatPrice(list.priceCents, list.currency)}/mes
                   </td>
                   <td className="px-4 py-4">
                     <Badge>{list.subscriberCount}</Badge>

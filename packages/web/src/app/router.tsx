@@ -1,12 +1,14 @@
 import { Routes, Route } from "react-router-dom";
 import { LandingPage } from "@/pages/Landing";
+import { PricingPage } from "@/pages/Pricing";
 import { DashboardPage } from "@/pages/Dashboard";
 import { ListDetailPage } from "@/pages/ListDetail";
 import { SubscriptionsPage } from "@/pages/Subscriptions";
+import { PlansPage } from "@/pages/Plans";
+import { CreditsPage } from "@/pages/Credits";
 import { AccountPage } from "@/pages/Account";
 import { AdminListsPage } from "@/pages/admin/Lists";
 import { AdminRequestsPage } from "@/pages/admin/Requests";
-import { AdminConfigPage } from "@/pages/admin/Config";
 import { AdminUsersPage } from "@/pages/admin/Users";
 import {
   PrivacyPolicyPage,
@@ -24,6 +26,7 @@ export function AppRouter() {
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<LandingPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
 
       {/* Legal routes */}
       <Route path="/legal/aviso-legal" element={<LegalNoticePage />} />
@@ -44,6 +47,8 @@ export function AppRouter() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="lists/:listId" element={<ListDetailPage />} />
         <Route path="subscriptions" element={<SubscriptionsPage />} />
+        <Route path="plans" element={<PlansPage />} />
+        <Route path="credits" element={<CreditsPage />} />
         <Route path="account" element={<AccountPage />} />
       </Route>
 
@@ -59,7 +64,6 @@ export function AppRouter() {
         <Route index element={<AdminListsPage />} />
         <Route path="lists" element={<AdminListsPage />} />
         <Route path="requests" element={<AdminRequestsPage />} />
-        <Route path="config" element={<AdminConfigPage />} />
         <Route path="users" element={<AdminUsersPage />} />
       </Route>
     </Routes>

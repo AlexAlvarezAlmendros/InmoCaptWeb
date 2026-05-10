@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
+import { Link } from "react-router-dom";
 import {
   Card,
   CardHeader,
@@ -14,11 +15,13 @@ import {
   useDeleteAccount,
 } from "@/hooks/useUserProfile";
 import { useCreatePortalSession } from "@/hooks/useBilling";
+import { useUserPlan } from "@/hooks/usePlan";
 import { formatDate } from "@/lib/utils";
 
 export function AccountPage() {
   const { user, logout } = useAuth0();
   const { data: profile, isLoading } = useUserProfile();
+  const { data: userPlan } = useUserPlan();
   const updatePreferences = useUpdatePreferences();
   const createPortalSession = useCreatePortalSession();
 
@@ -195,6 +198,104 @@ export function AccountPage() {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Plan */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Plan actual</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {userPlan ? (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-lg font-semibold text-slate-900 dark:text-white">
+                    {userPlan.planName}
+                  </span>
+                  {userPlan.planId === "trial" ? (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                      Periodo de prueba
+                    </span>
+                  ) : userPlan.status === "canceling" ? (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                      Activo · No se renovará
+                    </span>
+                  ) : userPlan.isActive ? (
+                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                      Activo
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      Cancelado
+                    </span>
+                  )}
+                </div>
+                <div className="grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <p className="text-slate-500">Créditos disponibles</p>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {userPlan.credits.total}
+                      <span className="ml-1 text-xs font-normal text-slate-500">
+                        ({userPlan.credits.planCredits} plan +{" "}
+                        {userPlan.credits.topupCredits} top-up)
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">
+                      {userPlan.planId === "trial" || userPlan.status === "canceling"
+                        ? "Acceso hasta el"
+                        : "Renueva el"}
+                    </p>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {userPlan.currentPeriodEnd
+                        ? formatDate(userPlan.currentPeriodEnd)
+                        : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Listas permitidas</p>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {userPlan.maxLists === null
+                        ? "Ilimitadas"
+                        : userPlan.maxLists}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Créditos mensuales</p>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {userPlan.monthlyCredits}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:items-end">
+                {userPlan.isActive && (
+                  <Link to="/app/plans">
+                    <Button variant="secondary" size="sm">
+                      {userPlan.status === "canceling" ? "Ver planes" : "Cambiar plan"}
+                    </Button>
+                  </Link>
+                )}
+                <Link to="/app/credits">
+                  <Button variant="ghost" size="sm">
+                    Comprar créditos
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-slate-600 dark:text-slate-400">
+                No tienes un plan activo.
+              </p>
+              <Link to="/app/plans">
+                <Button size="sm">Ver planes</Button>
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
 

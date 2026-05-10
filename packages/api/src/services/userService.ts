@@ -1,6 +1,12 @@
 import { db } from "../config/database.js";
 import type { AuthUser } from "../plugins/auth.js";
 import { sendWelcomeEmail } from "./emailService.js";
+import {
+  createTrialForUser,
+  getPlanById,
+  TRIAL_PLAN_ID,
+} from "./planService.js";
+import { resetPlanCredits } from "./creditService.js";
 
 export interface DbUser {
   id: string;
@@ -10,6 +16,7 @@ export interface DbUser {
   email_notifications_on: number;
   stripe_customer_id: string | null;
   is_test_user: number;
+  trial_used: number;
 }
 
 export interface AdminUserWithStats extends DbUser {
@@ -95,6 +102,23 @@ export async function ensureUserExists(authUser: AuthUser): Promise<DbUser> {
     );
   }
 
+  // Provision the free trial (plan=trial, 3 credits, 7 days)
+  try {
+    const result = await createTrialForUser(authUser.sub);
+    if (result.created) {
+      const trialPlan = await getPlanById(TRIAL_PLAN_ID);
+      if (trialPlan && trialPlan.monthly_credits > 0) {
+        await resetPlanCredits({
+          userId: authUser.sub,
+          newAmount: trialPlan.monthly_credits,
+          note: "trial_grant",
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("[Trial] Failed to provision trial for new user:", err);
+  }
+
   return {
     id: authUser.sub,
     email: authUser.email || "",
@@ -103,6 +127,7 @@ export async function ensureUserExists(authUser: AuthUser): Promise<DbUser> {
     email_notifications_on: 1,
     stripe_customer_id: null,
     is_test_user: 0,
+    trial_used: 1,
   };
 }
 

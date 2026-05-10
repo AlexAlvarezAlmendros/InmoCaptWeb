@@ -36,6 +36,14 @@ export async function runMigrations(): Promise<void> {
       sql: "ALTER TABLE users ADD COLUMN is_test_user INTEGER DEFAULT 0",
       description: "Add is_test_user column to users",
     },
+    {
+      sql: "ALTER TABLE users ADD COLUMN trial_used INTEGER DEFAULT 0",
+      description: "Add trial_used column to users (subscription model v2)",
+    },
+    {
+      sql: "ALTER TABLE user_plan_subscriptions ADD COLUMN pending_plan_id TEXT REFERENCES plans(id)",
+      description: "Add pending_plan_id for scheduled plan downgrades",
+    },
   ];
 
   for (const migration of migrations) {

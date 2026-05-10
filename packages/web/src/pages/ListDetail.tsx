@@ -10,7 +10,9 @@ import {
 } from "@/components/ui";
 import { formatPrice } from "@/lib/utils";
 import { PropertyState, Property } from "@/types";
-import { useSubscription } from "@/hooks/useSubscriptions";
+import { useUserPlan } from "@/hooks/usePlan";
+import { useList } from "@/hooks/useList";
+import { useRevealProperty } from "@/hooks/useReveal";
 import {
   useListProperties,
   useUpdatePropertyState,
@@ -29,14 +31,62 @@ const STATE_FILTERS: { value: PropertyState | "all"; label: string }[] = [
   ...PROPERTY_STATES,
 ];
 
+function RevealButton({
+  onReveal,
+  isLoading,
+  size = "sm",
+}: {
+  onReveal: () => void;
+  isLoading: boolean;
+  size?: "sm" | "xs";
+}) {
+  const padding = size === "xs" ? "px-2 py-0.5" : "px-2.5 py-1";
+  return (
+    <button
+      onClick={onReveal}
+      disabled={isLoading}
+      className={`inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/5 ${padding} text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-60`}
+    >
+      {isLoading ? (
+        <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      ) : (
+        <svg
+          className="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+          />
+        </svg>
+      )}
+      Revelar · 1 crédito
+    </button>
+  );
+}
+
 function PropertyRow({
   property,
   onStateChange,
   onCommentChange,
+  onReveal,
+  isRevealingThis,
 }: {
   property: Property;
   onStateChange: (propertyId: string, state: PropertyState) => void;
   onCommentChange: (propertyId: string, comment: string) => void;
+  onReveal: (propertyId: string) => void;
+  isRevealingThis: boolean;
 }) {
   const [isEditingComment, setIsEditingComment] = useState(false);
   const [commentValue, setCommentValue] = useState(property.comment || "");
@@ -114,6 +164,11 @@ function PropertyRow({
           >
             {property.phone}
           </a>
+        ) : property.isRevealed === false ? (
+          <RevealButton
+            onReveal={() => onReveal(property.id)}
+            isLoading={isRevealingThis}
+          />
         ) : (
           <span className="text-slate-400">-</span>
         )}
@@ -223,7 +278,7 @@ function PropertyRow({
         )}
       </td>
       <td className="whitespace-nowrap px-3 py-3 text-sm">
-        {property.sourceUrl && (
+        {property.sourceUrl ? (
           <a
             href={property.sourceUrl}
             target="_blank"
@@ -245,7 +300,9 @@ function PropertyRow({
               />
             </svg>
           </a>
-        )}
+        ) : property.isRevealed === false ? (
+          <span className="text-xs text-slate-400">Revelar para ver</span>
+        ) : null}
       </td>
     </tr>
   );
@@ -256,10 +313,14 @@ function PropertyCard({
   property,
   onStateChange,
   onCommentChange,
+  onReveal,
+  isRevealingThis,
 }: {
   property: Property;
   onStateChange: (propertyId: string, state: PropertyState) => void;
   onCommentChange: (propertyId: string, comment: string) => void;
+  onReveal: (propertyId: string) => void;
+  isRevealingThis: boolean;
 }) {
   const [isEditingComment, setIsEditingComment] = useState(false);
   const [commentValue, setCommentValue] = useState(property.comment || "");
@@ -366,6 +427,11 @@ function PropertyCard({
           >
             {property.phone}
           </a>
+        ) : property.isRevealed === false ? (
+          <RevealButton
+            onReveal={() => onReveal(property.id)}
+            isLoading={isRevealingThis}
+          />
         ) : (
           <span className="text-slate-400">-</span>
         )}
@@ -487,12 +553,16 @@ export function ListDetailPage() {
   const { listId } = useParams<{ listId: string }>();
   const navigate = useNavigate();
   const [stateFilter, setStateFilter] = useState<PropertyState | "all">("all");
+  const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
 
-  const {
-    data: subscription,
-    isLoading: isLoadingSubscription,
-    hasAccess,
-  } = useSubscription(listId || "");
+  const { data: userPlan, isLoading: isLoadingPlan } = useUserPlan();
+  const { data: listInfo, isLoading: isLoadingList } = useList(listId);
+
+  const hasAccess = !!(
+    userPlan &&
+    userPlan.isActive &&
+    (userPlan.maxLists === null || userPlan.listAccess.includes(listId || ""))
+  );
 
   const {
     data,
@@ -508,6 +578,7 @@ export function ListDetailPage() {
 
   const updateStateMutation = useUpdatePropertyState();
   const updateCommentMutation = useUpdatePropertyComment();
+  const revealMutation = useRevealProperty();
 
   const handleStateChange = useCallback(
     (propertyId: string, state: PropertyState) => {
@@ -525,6 +596,32 @@ export function ListDetailPage() {
     [listId, updateCommentMutation],
   );
 
+  const handleReveal = useCallback(
+    (propertyId: string) => {
+      if (!listId) return;
+      if (userPlan && userPlan.credits.total <= 0) {
+        setShowNoCreditsModal(true);
+        return;
+      }
+      revealMutation.mutate(
+        { listId, propertyId },
+        {
+          onError: (err) => {
+            if (err.status === 402) {
+              setShowNoCreditsModal(true);
+            }
+          },
+        },
+      );
+    },
+    [listId, userPlan, revealMutation],
+  );
+
+  const revealingId =
+    revealMutation.isPending && revealMutation.variables
+      ? revealMutation.variables.propertyId
+      : null;
+
   // Flatten all pages of properties
   const properties = data?.pages.flatMap((page) => page.data) ?? [];
   const totalProperties = data?.pages[0]?.total ?? 0;
@@ -536,7 +633,7 @@ export function ListDetailPage() {
   };
 
   // Loading state
-  if (isLoadingSubscription) {
+  if (isLoadingPlan || isLoadingList) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -570,11 +667,9 @@ export function ListDetailPage() {
                 Acceso restringido
               </h2>
               <p className="mb-4 text-slate-500">
-                No tienes una suscripción activa para esta lista.
+                Esta lista no está incluida en tu plan actual.
               </p>
-              <Button onClick={() => navigate("/app/subscriptions")}>
-                Ver suscripciones
-              </Button>
+              <Button onClick={() => navigate("/app/plans")}>Ver planes</Button>
             </div>
           </CardContent>
         </Card>
@@ -607,11 +702,48 @@ export function ListDetailPage() {
             Volver al dashboard
           </button>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            {subscription?.listName}
+            {listInfo?.name}
           </h1>
           <p className="mt-1 text-slate-600 dark:text-slate-400">
-            {subscription?.listLocation} • {totalProperties} inmuebles
+            {listInfo?.location} • {totalProperties} inmuebles
           </p>
+          {userPlan && (
+            <button
+              onClick={() => navigate("/app/credits")}
+              className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-colors ${
+                userPlan.credits.total <= 0
+                  ? "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300"
+                  : userPlan.credits.total <= 3
+                    ? "bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300"
+                    : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span>
+                Créditos:{" "}
+                <span className="font-semibold">{userPlan.credits.total}</span>
+                <span className="ml-1 hidden sm:inline">
+                  ({userPlan.credits.planCredits} plan +{" "}
+                  {userPlan.credits.topupCredits} top-up)
+                </span>
+              </span>
+              {userPlan.credits.total <= 3 && (
+                <span className="ml-1 font-medium">· Comprar</span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* State filter */}
@@ -728,6 +860,8 @@ export function ListDetailPage() {
                       property={property}
                       onStateChange={handleStateChange}
                       onCommentChange={handleCommentChange}
+                      onReveal={handleReveal}
+                      isRevealingThis={revealingId === property.id}
                     />
                   ))}
                 </tbody>
@@ -743,6 +877,8 @@ export function ListDetailPage() {
                 property={property}
                 onStateChange={handleStateChange}
                 onCommentChange={handleCommentChange}
+                onReveal={handleReveal}
+                isRevealingThis={revealingId === property.id}
               />
             ))}
           </div>
@@ -772,6 +908,57 @@ export function ListDetailPage() {
             Mostrando {properties.length} de {totalProperties} inmuebles
           </p>
         </>
+      )}
+
+      {/* No-credits modal */}
+      {showNoCreditsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowNoCreditsModal(false)}
+        >
+          <div
+            className="max-w-md rounded-lg bg-card-light p-6 shadow-xl dark:bg-card-dark"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+              <svg
+                className="h-6 w-6 text-amber-600 dark:text-amber-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Te has quedado sin créditos
+            </h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Cada revelado consume 1 crédito. Compra un pack de top-up (sin
+              caducidad) o mejora tu plan para continuar revelando contactos.
+            </p>
+            <div className="mt-6 flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setShowNoCreditsModal(false)}
+                className="flex-1"
+              >
+                Cerrar
+              </Button>
+              <Button
+                onClick={() => navigate("/app/credits?reason=empty")}
+                className="flex-1"
+              >
+                Comprar créditos
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

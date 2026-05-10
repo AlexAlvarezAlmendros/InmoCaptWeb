@@ -37,9 +37,17 @@ export function LandingPage() {
           >
             InmoCapt
           </a>
-          <Button onClick={handleGetStarted}>
-            {isAuthenticated ? "Ir al panel" : "Empezar ahora"}
-          </Button>
+          <div className="flex items-center gap-4">
+            <Link
+              to="/pricing"
+              className="hidden text-sm font-medium text-slate-600 transition-colors hover:text-primary dark:text-slate-300 sm:inline"
+            >
+              Precios
+            </Link>
+            <Button onClick={handleGetStarted}>
+              {isAuthenticated ? "Ir al panel" : "Empezar ahora"}
+            </Button>
+          </div>
         </nav>
       </header>
 
@@ -523,6 +531,47 @@ export function LandingPage() {
                 {/* Decorative glow */}
                 <div className="pointer-events-none absolute inset-0 -z-10 rounded-2xl bg-gradient-to-br from-primary/20 via-accent/10 to-transparent blur-2xl" />
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Pricing CTA */}
+        <section
+          id="pricing"
+          aria-labelledby="pricing-heading"
+          className="border-t border-border-light py-12 sm:py-20 dark:border-border-dark"
+        >
+          <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1 text-sm font-medium text-accent">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              Prueba gratis 7 días · 3 créditos incluidos
+            </span>
+            <h2
+              id="pricing-heading"
+              className="mt-4 text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl"
+            >
+              Planes desde 29 €/mes
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-base text-slate-600 dark:text-slate-400">
+              Starter, Pro y Unlimited. Cada plan incluye créditos mensuales
+              para revelar contactos. Los top-ups comprados nunca caducan.
+            </p>
+            <div className="mt-8">
+              <Link to="/pricing">
+                <Button size="lg">Ver planes y precios</Button>
+              </Link>
             </div>
           </div>
         </section>

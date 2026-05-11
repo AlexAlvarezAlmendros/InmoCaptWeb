@@ -39,6 +39,8 @@ import {
   uploadPropertiesSchema,
   idealistaUploadSchema,
   bulkDiscontinuedSchema,
+  updatePlanSchema,
+  updateCreditPackSchema,
   zodValidate,
 } from "../schemas/validation.js";
 import { getListSubscribersWithNotifications } from "../services/subscriptionService.js";
@@ -575,15 +577,12 @@ export async function adminRoutes(fastify: FastifyInstance) {
     { preHandler: [authenticate, requireRole("admin")] },
     async (request, reply) => {
       const { planId } = request.params as { planId: string };
-      const body = request.body as {
-        name?: string;
-        priceCents?: number;
-        maxLists?: number | null;
-        monthlyCredits?: number;
-        trialDurationDays?: number | null;
-        active?: boolean;
-        sortOrder?: number;
-      };
+
+      const validation = zodValidate(updatePlanSchema, request.body);
+      if (!validation.success) {
+        return reply.code(400).send({ error: validation.error });
+      }
+      const body = validation.data;
 
       const plan = await getPlanById(planId);
       if (!plan) return reply.code(404).send({ error: "Plan not found" });
@@ -654,13 +653,12 @@ export async function adminRoutes(fastify: FastifyInstance) {
     { preHandler: [authenticate, requireRole("admin")] },
     async (request, reply) => {
       const { packId } = request.params as { packId: string };
-      const body = request.body as {
-        name?: string;
-        credits?: number;
-        priceCents?: number;
-        active?: boolean;
-        sortOrder?: number;
-      };
+
+      const validation = zodValidate(updateCreditPackSchema, request.body);
+      if (!validation.success) {
+        return reply.code(400).send({ error: validation.error });
+      }
+      const body = validation.data;
 
       const existing = await db.execute({
         sql: "SELECT id FROM credit_packs WHERE id = ?",

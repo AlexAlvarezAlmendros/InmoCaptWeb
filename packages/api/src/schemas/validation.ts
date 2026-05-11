@@ -184,6 +184,32 @@ export const listRequestActionSchema = z.object({
 export type ListRequestActionInput = z.infer<typeof listRequestActionSchema>;
 
 // ============================================
+// Plans & Credit Packs Management (admin)
+// ============================================
+
+export const updatePlanSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  priceCents: z.number().int().min(0).optional(),
+  maxLists: z.number().int().min(1).nullable().optional(),
+  monthlyCredits: z.number().int().min(0).optional(),
+  trialDurationDays: z.number().int().min(1).nullable().optional(),
+  active: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export type UpdatePlanInput = z.infer<typeof updatePlanSchema>;
+
+export const updateCreditPackSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  credits: z.number().int().min(1).optional(),
+  priceCents: z.number().int().min(0).optional(),
+  active: z.boolean().optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export type UpdateCreditPackInput = z.infer<typeof updateCreditPackSchema>;
+
+// ============================================
 // Automation Routes
 // ============================================
 

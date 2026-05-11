@@ -1,3 +1,4 @@
+import { timingSafeEqual as cryptoTimingSafeEqual, createHash } from "node:crypto";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import jwksClient from "jwks-rsa";
 import jwt from "jsonwebtoken";
@@ -12,7 +13,7 @@ const client = jwksClient({
   jwksUri: `https://${env.AUTH0_DOMAIN}/.well-known/jwks.json`,
   cache: true,
   rateLimit: true,
-  jwksRequestsPerMinute: 5,
+  jwksRequestsPerMinute: 30,
 });
 
 // Get signing key from JWKS
@@ -31,6 +32,7 @@ function getKey(header: jwt.JwtHeader, callback: jwt.SigningKeyCallback) {
 export interface AuthUser {
   sub: string;
   email?: string;
+  emailVerified?: boolean;
   roles: string[];
   permissions: string[];
 }
@@ -79,6 +81,7 @@ export async function authenticate(
       email: (decoded.email || decoded[`${AUTH0_NAMESPACE}/email`]) as
         | string
         | undefined,
+      emailVerified: Boolean(decoded.email_verified),
       roles: ((decoded[`${AUTH0_NAMESPACE}/roles`] as string[]) || []).map(
         (r) => r.toLowerCase(),
       ),
@@ -98,6 +101,7 @@ export function requireRole(role: string) {
   ): Promise<void> {
     if (!request.user.roles.includes(role)) {
       reply.code(403).send({ error: "Insufficient permissions" });
+      return;
     }
   };
 }
@@ -146,12 +150,12 @@ export async function authenticateApiKey(
     return;
   }
 
-  // Constant-time comparison to prevent timing attacks
+  // Hash both keys to a fixed length, then compare with Node's crypto.timingSafeEqual
+  // to prevent timing attacks and avoid leaking key length.
   const expectedKey = env.API_AUTOMATION_KEY;
-  if (
-    apiKey.length !== expectedKey.length ||
-    !timingSafeEqual(apiKey, expectedKey)
-  ) {
+  const apiKeyHash = createHash("sha256").update(apiKey).digest();
+  const expectedKeyHash = createHash("sha256").update(expectedKey).digest();
+  if (!cryptoTimingSafeEqual(apiKeyHash, expectedKeyHash)) {
     reply.code(401).send({ error: "Invalid API key" });
     return;
   }
@@ -165,12 +169,3 @@ export async function authenticateApiKey(
   };
 }
 
-// Constant-time string comparison
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
-}

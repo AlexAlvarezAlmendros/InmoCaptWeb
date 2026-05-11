@@ -36,6 +36,14 @@ const envSchema = z.object({
 
   // Automation
   API_AUTOMATION_KEY: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.NODE_ENV === "production" && !data.API_AUTOMATION_KEY) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "API_AUTOMATION_KEY is required in production",
+      path: ["API_AUTOMATION_KEY"],
+    });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

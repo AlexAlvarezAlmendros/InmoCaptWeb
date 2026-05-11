@@ -66,7 +66,7 @@ export async function buildApp() {
       if (allowedOrigins.includes(origin)) {
         cb(null, true);
       } else {
-        cb(null, true); // Allow all origins — API key / JWT is the real guard
+        cb(new Error("Not allowed by CORS"), false);
       }
     },
     credentials: true,

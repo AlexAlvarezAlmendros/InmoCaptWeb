@@ -167,6 +167,7 @@ export async function listsRoutes(fastify: FastifyInstance) {
           ...p,
           phone: isRevealed ? p.phone : null,
           sourceUrl: isRevealed ? p.sourceUrl : null,
+          ownerName: isRevealed ? p.ownerName : null,
           isRevealed,
         };
       });

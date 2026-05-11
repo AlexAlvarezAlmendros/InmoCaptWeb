@@ -43,6 +43,17 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
   }
 }
 
+// ─── HTML Escaping ────────────────────────────────────────────────
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // ─── Shared Layout ────────────────────────────────────────────────
 
 function emailLayout(content: string): string {
@@ -105,6 +116,7 @@ export async function sendSubscriptionActivatedEmail(
   listId: string,
 ): Promise<boolean> {
   const listUrl = `${env.FRONTEND_URL}/app/lists/${listId}`;
+  const safeName = escapeHtml(listName);
 
   return sendEmail({
     to,
@@ -114,7 +126,7 @@ export async function sendSubscriptionActivatedEmail(
         ¡Suscripción activada!
       </h1>
       <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-        Tu suscripción a <strong>${listName}</strong> está activa. Ya puedes acceder a todos los inmuebles de la lista.
+        Tu suscripción a <strong>${safeName}</strong> está activa. Ya puedes acceder a todos los inmuebles de la lista.
       </p>
       ${primaryButton("Ver lista", listUrl)}
       <p style="color: #94a3b8; font-size: 13px; margin: 16px 0 0;">
@@ -132,6 +144,7 @@ export async function sendSubscriptionCancelledEmail(
   to: string,
   listName: string,
 ): Promise<boolean> {
+  const safeName = escapeHtml(listName);
   return sendEmail({
     to,
     subject: `Suscripción cancelada: ${listName}`,
@@ -140,7 +153,7 @@ export async function sendSubscriptionCancelledEmail(
         Suscripción cancelada
       </h1>
       <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 8px;">
-        Tu suscripción a <strong>${listName}</strong> ha sido cancelada. Ya no tendrás acceso a los inmuebles de esta lista.
+        Tu suscripción a <strong>${safeName}</strong> ha sido cancelada. Ya no tendrás acceso a los inmuebles de esta lista.
       </p>
       <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
         Si cambias de opinión, siempre puedes volver a suscribirte.
@@ -161,22 +174,24 @@ export async function sendListUpdatedEmail(
   listId: string,
 ): Promise<boolean> {
   const listUrl = `${env.FRONTEND_URL}/app/lists/${listId}`;
+  const safeName = escapeHtml(listName);
+  const safeCount = Number(newPropertiesCount);
 
   return sendEmail({
     to,
-    subject: `${listName} — ${newPropertiesCount} nuevos inmuebles`,
+    subject: `${listName} — ${safeCount} nuevos inmuebles`,
     html: emailLayout(`
       <h1 style="color: #1E3A5F; font-size: 24px; margin: 0 0 16px;">
         Nueva actualización disponible
       </h1>
       <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-        La lista <strong>${listName}</strong> tiene 
-        <strong style="color: #10B981;">${newPropertiesCount} nuevos inmuebles</strong> 
+        La lista <strong>${safeName}</strong> tiene
+        <strong style="color: #10B981;">${safeCount} nuevos inmuebles</strong>
         disponibles para ti.
       </p>
       ${primaryButton("Ver inmuebles", listUrl)}
     `),
-    text: `La lista ${listName} tiene ${newPropertiesCount} nuevos inmuebles. Ver: ${listUrl}`,
+    text: `La lista ${listName} tiene ${safeCount} nuevos inmuebles. Ver: ${listUrl}`,
   });
 }
 
@@ -188,6 +203,8 @@ export async function sendListRequestApprovedEmail(
   listName: string,
   location: string,
 ): Promise<boolean> {
+  const safeName = escapeHtml(listName);
+  const safeLocation = escapeHtml(location);
   return sendEmail({
     to,
     subject: `Tu solicitud de lista ha sido aprobada: ${listName}`,
@@ -196,8 +213,8 @@ export async function sendListRequestApprovedEmail(
         ¡Solicitud aprobada!
       </h1>
       <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-        Tu solicitud de una lista para <strong>${location}</strong> ha sido aprobada. 
-        La lista <strong>${listName}</strong> ya está disponible.
+        Tu solicitud de una lista para <strong>${safeLocation}</strong> ha sido aprobada.
+        La lista <strong>${safeName}</strong> ya está disponible.
       </p>
       ${primaryButton("Ver listas disponibles", `${env.FRONTEND_URL}/app/subscriptions`)}
     `),
@@ -212,6 +229,7 @@ export async function sendListRequestRejectedEmail(
   to: string,
   location: string,
 ): Promise<boolean> {
+  const safeLocation = escapeHtml(location);
   return sendEmail({
     to,
     subject: "Solicitud de lista no aprobada",
@@ -220,7 +238,7 @@ export async function sendListRequestRejectedEmail(
         Solicitud no aprobada
       </h1>
       <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
-        Lamentamos informarte de que tu solicitud de una lista para <strong>${location}</strong> 
+        Lamentamos informarte de que tu solicitud de una lista para <strong>${safeLocation}</strong>
         no ha podido ser aprobada en este momento.
       </p>
       <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">

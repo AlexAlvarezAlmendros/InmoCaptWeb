@@ -71,9 +71,9 @@ export async function ensureUserExists(authUser: AuthUser): Promise<DbUser> {
   if (existing.rows.length > 0) {
     const user = existing.rows[0] as unknown as DbUser;
 
-    // Update email if changed and last_login timestamp
+    // Update email only if the JWT reports it as verified to prevent account takeover
     const updatedEmail =
-      authUser.email && user.email !== authUser.email
+      authUser.email && authUser.emailVerified && user.email !== authUser.email
         ? authUser.email
         : user.email;
 
@@ -255,29 +255,24 @@ export async function getStripeCustomerId(
  * will be cleaned up automatically, but we delete explicitly for clarity.
  */
 export async function deleteUser(userId: string): Promise<void> {
-  // Delete property agent states
-  await db.execute({
-    sql: "DELETE FROM property_agent_state WHERE user_id = ?",
-    args: [userId],
-  });
-
-  // Delete list requests
-  await db.execute({
-    sql: "DELETE FROM list_requests WHERE user_id = ?",
-    args: [userId],
-  });
-
-  // Delete subscriptions
-  await db.execute({
-    sql: "DELETE FROM subscriptions WHERE user_id = ?",
-    args: [userId],
-  });
-
-  // Delete the user
-  await db.execute({
-    sql: "DELETE FROM users WHERE id = ?",
-    args: [userId],
-  });
+  await db.batch([
+    {
+      sql: "DELETE FROM property_agent_state WHERE user_id = ?",
+      args: [userId],
+    },
+    {
+      sql: "DELETE FROM list_requests WHERE user_id = ?",
+      args: [userId],
+    },
+    {
+      sql: "DELETE FROM subscriptions WHERE user_id = ?",
+      args: [userId],
+    },
+    {
+      sql: "DELETE FROM users WHERE id = ?",
+      args: [userId],
+    },
+  ]);
 }
 
 /**

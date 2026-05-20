@@ -278,13 +278,9 @@ export async function addUserListAccess(
   const userPlan = await getUserPlanWithDefinition(userId);
   if (!userPlan) return { ok: false, reason: "no_plan" };
   if (!userPlan.isActive) return { ok: false, reason: "plan_inactive" };
-  if (userPlan.plan.max_lists === null) {
-    return { ok: true };
-  }
-
   const current = await getUserListAccessIds(userId);
   if (current.includes(listId)) return { ok: true };
-  if (current.length >= userPlan.plan.max_lists) {
+  if (userPlan.plan.max_lists !== null && current.length >= userPlan.plan.max_lists) {
     return { ok: false, reason: "quota_full" };
   }
 

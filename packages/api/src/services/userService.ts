@@ -82,6 +82,23 @@ export async function ensureUserExists(authUser: AuthUser): Promise<DbUser> {
       args: [updatedEmail, authUser.sub],
     });
 
+    // Provision trial if the user has no subscription yet (e.g. created before v2 tables existed)
+    try {
+      const result = await createTrialForUser(authUser.sub);
+      if (result.created) {
+        const trialPlan = await getPlanById(TRIAL_PLAN_ID);
+        if (trialPlan && trialPlan.monthly_credits > 0) {
+          await resetPlanCredits({
+            userId: authUser.sub,
+            newAmount: trialPlan.monthly_credits,
+            note: "trial_grant",
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("[Trial] Failed to provision trial for existing user:", err);
+    }
+
     return { ...user, email: updatedEmail };
   }
 

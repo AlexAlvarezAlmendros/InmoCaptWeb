@@ -49,6 +49,7 @@ import {
   sendListRequestApprovedEmail,
   sendListRequestRejectedEmail,
 } from "../services/emailService.js";
+import { stripe } from "../config/stripe.js";
 
 export async function adminRoutes(fastify: FastifyInstance) {
   // ============================================
@@ -706,6 +707,122 @@ export async function adminRoutes(fastify: FastifyInstance) {
         args: [packId],
       });
       return { data: updated.rows[0] };
+    },
+  );
+
+  // ============================================
+  // Stripe Sync (v2)
+  // ============================================
+
+  fastify.post(
+    "/stripe-sync",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (_request, _reply) => {
+      const results: Array<{ id: string; type: string; action: string; stripe_price_id?: string }> = [];
+
+      async function verifyPriceExists(priceId: string): Promise<boolean> {
+        try {
+          await stripe.prices.retrieve(priceId);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      // Sync plans
+      const plansResult = await db.execute("SELECT * FROM plans ORDER BY sort_order");
+      for (const row of plansResult.rows) {
+        const plan = row as unknown as {
+          id: string; name: string; price_cents: number; currency: string;
+          monthly_credits: number; max_lists: number | null; stripe_price_id: string | null;
+        };
+
+        if (plan.id === "trial") {
+          results.push({ id: plan.id, type: "plan", action: "skipped (trial)" });
+          continue;
+        }
+
+        if (plan.stripe_price_id && (await verifyPriceExists(plan.stripe_price_id))) {
+          results.push({ id: plan.id, type: "plan", action: "already_synced", stripe_price_id: plan.stripe_price_id });
+          continue;
+        }
+
+        const existingProducts = await stripe.products.search({
+          query: `active:'true' AND metadata['plan_id']:'${plan.id}'`,
+        });
+        let productId: string;
+        if (existingProducts.data[0]) {
+          productId = existingProducts.data[0].id;
+        } else {
+          const description = plan.max_lists === null
+            ? `Listas ilimitadas + ${plan.monthly_credits} créditos/mes`
+            : `${plan.max_lists} lista${plan.max_lists > 1 ? "s" : ""} + ${plan.monthly_credits} créditos/mes`;
+          const product = await stripe.products.create({
+            name: `InmoCapt · ${plan.name}`,
+            description,
+            metadata: { plan_id: plan.id },
+          });
+          productId = product.id;
+        }
+
+        const price = await stripe.prices.create({
+          product: productId,
+          unit_amount: plan.price_cents,
+          currency: plan.currency.toLowerCase(),
+          recurring: { interval: "month" },
+          metadata: { plan_id: plan.id },
+        });
+
+        await db.execute({
+          sql: "UPDATE plans SET stripe_price_id = ? WHERE id = ?",
+          args: [price.id, plan.id],
+        });
+        results.push({ id: plan.id, type: "plan", action: "synced", stripe_price_id: price.id });
+      }
+
+      // Sync credit packs
+      const packsResult = await db.execute("SELECT * FROM credit_packs ORDER BY sort_order");
+      for (const row of packsResult.rows) {
+        const pack = row as unknown as {
+          id: string; name: string; credits: number; price_cents: number;
+          currency: string; stripe_price_id: string | null;
+        };
+
+        if (pack.stripe_price_id && (await verifyPriceExists(pack.stripe_price_id))) {
+          results.push({ id: pack.id, type: "pack", action: "already_synced", stripe_price_id: pack.stripe_price_id });
+          continue;
+        }
+
+        const existingProducts = await stripe.products.search({
+          query: `active:'true' AND metadata['pack_id']:'${pack.id}'`,
+        });
+        let productId: string;
+        if (existingProducts.data[0]) {
+          productId = existingProducts.data[0].id;
+        } else {
+          const product = await stripe.products.create({
+            name: `InmoCapt · ${pack.name}`,
+            description: `${pack.credits} créditos para revelar contactos (pago único, no caducan)`,
+            metadata: { pack_id: pack.id },
+          });
+          productId = product.id;
+        }
+
+        const price = await stripe.prices.create({
+          product: productId,
+          unit_amount: pack.price_cents,
+          currency: pack.currency.toLowerCase(),
+          metadata: { pack_id: pack.id },
+        });
+
+        await db.execute({
+          sql: "UPDATE credit_packs SET stripe_price_id = ? WHERE id = ?",
+          args: [price.id, pack.id],
+        });
+        results.push({ id: pack.id, type: "pack", action: "synced", stripe_price_id: price.id });
+      }
+
+      return { data: results };
     },
   );
 }

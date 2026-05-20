@@ -55,6 +55,9 @@ export function AdminLayout() {
               <NavLink to="/app/admin/users" className={navLinkClass}>
                 Usuarios
               </NavLink>
+              <NavLink to="/app/admin/maintenance" className={navLinkClass}>
+                Mantenimiento
+              </NavLink>
               <NavLink to="/app/dashboard" className={navLinkClass}>
                 ← Panel Agente
               </NavLink>
@@ -138,6 +141,13 @@ export function AdminLayout() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Usuarios
+              </NavLink>
+              <NavLink
+                to="/app/admin/maintenance"
+                className={mobileNavLinkClass}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Mantenimiento
               </NavLink>
               <NavLink
                 to="/app/dashboard"

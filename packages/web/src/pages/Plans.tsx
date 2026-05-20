@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CardContent } from "@/components/ui";
 import { formatPrice, formatDate } from "@/lib/utils";
 import {
@@ -11,6 +12,7 @@ import {
   useCancelPendingListChange,
   useVerifyPlanSession,
 } from "@/hooks/usePlan";
+import type { ApiError } from "@/services/apiClient";
 import type { Plan } from "@/types";
 
 function PlanCard({
@@ -160,6 +162,9 @@ export function PlansPage() {
   const [changePlanTarget, setChangePlanTarget] = useState<{ plan: Plan; type: "upgrade" | "downgrade" } | null>(null);
   const [changePlanResult, setChangePlanResult] = useState<{ type: "upgrade" | "downgrade"; planName: string; effective: string; creditsAdded?: number } | null>(null);
 
+  const queryClient = useQueryClient();
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
   const checkoutStatus = searchParams.get("checkout");
   const sessionId = searchParams.get("session_id");
   const verifiedRef = useRef(false);
@@ -189,6 +194,7 @@ export function PlansPage() {
     userPlan.planId !== "trial";
 
   const handlePlanSelect = (planId: string) => {
+    setCheckoutError(null);
     if (!hasPaidActivePlan) {
       // Trial or no plan: use Stripe Checkout
       setSelectedPlanId(planId);
@@ -196,8 +202,17 @@ export function PlansPage() {
         onSuccess: (url) => {
           window.location.href = url;
         },
-        onError: () => {
+        onError: (err) => {
           setSelectedPlanId(null);
+          const apiErr = err as ApiError;
+          const message = apiErr.message || "Error al iniciar el pago";
+          // If API says the user already has an active plan, refresh userPlan
+          // so the UI updates and the change-plan flow is used instead.
+          if (apiErr.status === 400 && message.toLowerCase().includes("ya tienes")) {
+            queryClient.invalidateQueries({ queryKey: ["userPlan"] });
+          } else {
+            setCheckoutError(message);
+          }
         },
       });
       return;
@@ -373,6 +388,13 @@ export function PlansPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Checkout error */}
+      {checkoutError && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+          {checkoutError}
+        </div>
       )}
 
       {/* Plan cards */}

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Badge,
@@ -555,6 +555,36 @@ export function ListDetailPage() {
   const [stateFilter, setStateFilter] = useState<PropertyState | "all">("all");
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
 
+  // Search / price-range filters (debounced before hitting the API)
+  const [searchInput, setSearchInput] = useState("");
+  const [minPriceInput, setMinPriceInput] = useState("");
+  const [maxPriceInput, setMaxPriceInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [appliedMinPrice, setAppliedMinPrice] = useState<number | undefined>();
+  const [appliedMaxPrice, setAppliedMaxPrice] = useState<number | undefined>();
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setAppliedSearch(searchInput.trim());
+      const min = minPriceInput.trim() === "" ? NaN : Number(minPriceInput);
+      const max = maxPriceInput.trim() === "" ? NaN : Number(maxPriceInput);
+      setAppliedMinPrice(Number.isFinite(min) ? min : undefined);
+      setAppliedMaxPrice(Number.isFinite(max) ? max : undefined);
+    }, 350);
+    return () => clearTimeout(timeout);
+  }, [searchInput, minPriceInput, maxPriceInput]);
+
+  const hasSearchFilters =
+    appliedSearch !== "" ||
+    appliedMinPrice !== undefined ||
+    appliedMaxPrice !== undefined;
+
+  const clearSearchFilters = useCallback(() => {
+    setSearchInput("");
+    setMinPriceInput("");
+    setMaxPriceInput("");
+  }, []);
+
   const { data: userPlan, isLoading: isLoadingPlan } = useUserPlan();
   const { data: listInfo, isLoading: isLoadingList } = useList(listId);
 
@@ -573,6 +603,9 @@ export function ListDetailPage() {
   } = useListProperties({
     listId: listId || "",
     stateFilter,
+    search: appliedSearch,
+    minPrice: appliedMinPrice,
+    maxPrice: appliedMaxPrice,
     enabled: !!listId && hasAccess,
   });
 
@@ -769,6 +802,75 @@ export function ListDetailPage() {
         </div>
       </div>
 
+      {/* Search / price filters */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <svg
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Buscar por localidad o calle..."
+            className="h-10 w-full rounded-lg border border-border-light bg-white pl-9 pr-3 text-sm placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-border-dark dark:bg-card-dark dark:placeholder:text-slate-500"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={minPriceInput}
+            onChange={(e) => setMinPriceInput(e.target.value)}
+            placeholder="Precio mín. €"
+            className="h-10 w-32 rounded-lg border border-border-light bg-white px-3 text-sm placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-border-dark dark:bg-card-dark dark:placeholder:text-slate-500"
+          />
+          <span className="text-slate-400">–</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={maxPriceInput}
+            onChange={(e) => setMaxPriceInput(e.target.value)}
+            placeholder="Precio máx. €"
+            className="h-10 w-32 rounded-lg border border-border-light bg-white px-3 text-sm placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-border-dark dark:bg-card-dark dark:placeholder:text-slate-500"
+          />
+          {hasSearchFilters && (
+            <button
+              onClick={clearSearchFilters}
+              className="flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-slate-500 hover:text-primary"
+              title="Limpiar búsqueda"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+              <span className="hidden sm:inline">Limpiar</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Stats row */}
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {PROPERTY_STATES.map((state) => {
@@ -804,17 +906,28 @@ export function ListDetailPage() {
           <CardContent>
             <div className="py-12">
               <p className="text-slate-500">
-                {stateFilter === "all"
-                  ? "No hay inmuebles en esta lista."
-                  : `No hay inmuebles con estado "${getStateLabel(stateFilter)}".`}
+                {hasSearchFilters
+                  ? "No hay inmuebles que coincidan con tu búsqueda."
+                  : stateFilter === "all"
+                    ? "No hay inmuebles en esta lista."
+                    : `No hay inmuebles con estado "${getStateLabel(stateFilter)}".`}
               </p>
-              {stateFilter !== "all" && (
+              {hasSearchFilters ? (
                 <button
-                  onClick={() => setStateFilter("all")}
+                  onClick={clearSearchFilters}
                   className="mt-2 text-primary hover:underline"
                 >
-                  Ver todos los inmuebles
+                  Limpiar búsqueda
                 </button>
+              ) : (
+                stateFilter !== "all" && (
+                  <button
+                    onClick={() => setStateFilter("all")}
+                    className="mt-2 text-primary hover:underline"
+                  >
+                    Ver todos los inmuebles
+                  </button>
+                )
               )}
             </div>
           </CardContent>

@@ -36,6 +36,11 @@ export const propertyIdParamSchema = z.object({
 export const propertiesQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().min(1).max(100).optional().default(50),
+  // Free-text search over locality / street / title (Idealista rawPayload)
+  search: z.string().trim().max(120).optional(),
+  // Price range (in euros, matching the `price` column)
+  minPrice: z.coerce.number().min(0).optional(),
+  maxPrice: z.coerce.number().min(0).optional(),
 });
 
 export type PropertiesQuery = z.infer<typeof propertiesQuerySchema>;

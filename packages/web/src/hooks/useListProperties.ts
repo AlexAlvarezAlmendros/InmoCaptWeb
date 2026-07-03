@@ -12,6 +12,11 @@ interface UseListPropertiesOptions {
   listId: string;
   limit?: number;
   stateFilter?: PropertyState | "all";
+  /** Free-text search over locality / street / title. */
+  search?: string;
+  /** Price range in euros (inclusive). */
+  minPrice?: number;
+  maxPrice?: number;
   enabled?: boolean;
 }
 
@@ -19,17 +24,31 @@ export function useListProperties({
   listId,
   limit = 50,
   stateFilter = "all",
+  search = "",
+  minPrice,
+  maxPrice,
   enabled = true,
 }: UseListPropertiesOptions) {
   const apiClient = useApiClient();
+  const trimmedSearch = search.trim();
 
   return useInfiniteQuery({
-    queryKey: ["listProperties", listId, stateFilter],
+    queryKey: [
+      "listProperties",
+      listId,
+      stateFilter,
+      trimmedSearch,
+      minPrice ?? null,
+      maxPrice ?? null,
+    ],
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams();
       params.set("limit", String(limit));
       if (pageParam) params.set("cursor", pageParam);
       if (stateFilter !== "all") params.set("state", stateFilter);
+      if (trimmedSearch) params.set("search", trimmedSearch);
+      if (minPrice != null) params.set("minPrice", String(minPrice));
+      if (maxPrice != null) params.set("maxPrice", String(maxPrice));
 
       return apiClient.get<PropertiesResponse>(
         `/lists/${listId}/properties?${params.toString()}`,

@@ -133,7 +133,8 @@ export async function listsRoutes(fastify: FastifyInstance) {
       }
 
       const { listId } = paramsResult.data;
-      const { cursor, limit = 50 } = queryResult.data;
+      const { cursor, limit = 50, search, minPrice, maxPrice } =
+        queryResult.data;
       const stateFilter = (request.query as { state?: string }).state as
         | PropertyState
         | "all"
@@ -156,6 +157,9 @@ export async function listsRoutes(fastify: FastifyInstance) {
         cursor,
         limit,
         stateFilter: stateFilter || "all",
+        search,
+        minPrice,
+        maxPrice,
       });
 
       // Mask contacts on properties the user hasn't revealed yet

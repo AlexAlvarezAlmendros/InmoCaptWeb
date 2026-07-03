@@ -39,6 +39,51 @@ export interface GetPropertiesOptions {
   cursor?: string;
   limit?: number;
   stateFilter?: PropertyState | "all";
+  /** Free-text search over locality / street / title (Idealista rawPayload). */
+  search?: string;
+  /** Minimum price (euros, inclusive), matching the `price` column. */
+  minPrice?: number;
+  /** Maximum price (euros, inclusive). */
+  maxPrice?: number;
+}
+
+/**
+ * Builds the SQL fragments shared by the data / count / stateCounts queries so
+ * that the free-text search and price range are applied consistently. Returns a
+ * clause (already prefixed with " AND ...") plus its ordered params.
+ */
+function buildSearchFilters(options: GetPropertiesOptions): {
+  clause: string;
+  params: (string | number)[];
+} {
+  const { search, minPrice, maxPrice } = options;
+  let clause = "";
+  const params: (string | number)[] = [];
+
+  const term = search?.trim();
+  if (term) {
+    // Escape LIKE wildcards so user input is matched literally.
+    const escaped = term.replace(/[\\%_]/g, (ch) => `\\${ch}`).toLowerCase();
+    clause += `
+      AND LOWER(
+        COALESCE(json_extract(p.raw_payload, '$.ubicacion'), '') || ' ' ||
+        COALESCE(json_extract(p.raw_payload, '$.titulo'), '') || ' ' ||
+        COALESCE(json_extract(p.raw_payload, '$.descripcion'), '')
+      ) LIKE ? ESCAPE '\\'`;
+    params.push(`%${escaped}%`);
+  }
+
+  if (minPrice != null) {
+    clause += " AND p.price >= ?";
+    params.push(minPrice);
+  }
+
+  if (maxPrice != null) {
+    clause += " AND p.price <= ?";
+    params.push(maxPrice);
+  }
+
+  return { clause, params };
 }
 
 export interface StateCounts {
@@ -156,6 +201,9 @@ export async function getPropertiesWithAgentState(
 ): Promise<PaginatedProperties> {
   const { cursor, limit = 50, stateFilter = "all" } = options;
 
+  // Shared free-text search + price range filters (data, count, stateCounts)
+  const searchFilters = buildSearchFilters(options);
+
   // Build the query
   let sql = `
     SELECT 
@@ -192,6 +240,10 @@ export async function getPropertiesWithAgentState(
     }
   }
 
+  // Free-text search + price range
+  sql += searchFilters.clause;
+  args.push(...searchFilters.params);
+
   // Cursor pagination
   if (cursor) {
     sql += " AND p.created_at < ?";
@@ -221,6 +273,9 @@ export async function getPropertiesWithAgentState(
       countArgs.push(stateFilter);
     }
   }
+
+  countSql += searchFilters.clause;
+  countArgs.push(...searchFilters.params);
 
   const countResult = await db.execute({ sql: countSql, args: countArgs });
   const total = Number(countResult.rows[0].count);
@@ -269,20 +324,25 @@ export async function getPropertiesWithAgentState(
   const nextCursor =
     hasMore && data.length > 0 ? data[data.length - 1].createdAt : null;
 
-  // Get counts by state (always unfiltered)
-  const stateCountsSql = `
+  // Get counts by state (respects the active search/price filters, but never
+  // the state filter itself — the cards always show the full distribution)
+  let stateCountsSql = `
     SELECT 
       COALESCE(pas.state, 'new') as state,
       COUNT(*) as count
     FROM properties p
-    LEFT JOIN property_agent_state pas 
+    LEFT JOIN property_agent_state pas
       ON pas.property_id = p.id AND pas.user_id = ?
     WHERE p.list_id = ?
-    GROUP BY COALESCE(pas.state, 'new')
   `;
+  const stateCountsArgs: (string | number)[] = [userId, listId];
+  stateCountsSql += searchFilters.clause;
+  stateCountsArgs.push(...searchFilters.params);
+  stateCountsSql += " GROUP BY COALESCE(pas.state, 'new')";
+
   const stateCountsResult = await db.execute({
     sql: stateCountsSql,
-    args: [userId, listId],
+    args: stateCountsArgs,
   });
 
   const stateCounts: StateCounts = {

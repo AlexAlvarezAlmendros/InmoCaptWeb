@@ -643,11 +643,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
       // 5. List request approved
       results.push({
         template: "list_request_approved",
-        success: await sendListRequestApprovedEmail(
-          email,
-          "Tarragona Costa",
-          "Tarragona",
-        ),
+        success: await sendListRequestApprovedEmail(email, "Tarragona"),
       });
       await delay(600);
 

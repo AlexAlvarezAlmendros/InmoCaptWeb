@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_login TEXT,
   is_test_user INTEGER DEFAULT 0,
   trial_used INTEGER DEFAULT 0,  -- 1 once the free trial has been consumed
+  blocked INTEGER DEFAULT 0,  -- 1 = access revoked by an admin
   created_at TEXT DEFAULT (datetime('now'))
 );
 

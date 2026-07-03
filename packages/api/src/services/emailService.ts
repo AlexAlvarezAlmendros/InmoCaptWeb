@@ -200,25 +200,23 @@ export async function sendListUpdatedEmail(
  */
 export async function sendListRequestApprovedEmail(
   to: string,
-  listName: string,
   location: string,
 ): Promise<boolean> {
-  const safeName = escapeHtml(listName);
   const safeLocation = escapeHtml(location);
   return sendEmail({
     to,
-    subject: `Tu solicitud de lista ha sido aprobada: ${listName}`,
+    subject: `Tu solicitud de lista ha sido aprobada: ${location}`,
     html: emailLayout(`
       <h1 style="color: #1E3A5F; font-size: 24px; margin: 0 0 16px;">
         ¡Solicitud aprobada!
       </h1>
       <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
         Tu solicitud de una lista para <strong>${safeLocation}</strong> ha sido aprobada.
-        La lista <strong>${safeName}</strong> ya está disponible.
+        Te avisaremos en cuanto la lista esté disponible.
       </p>
       ${primaryButton("Ver listas disponibles", `${env.FRONTEND_URL}/app/subscriptions`)}
     `),
-    text: `Tu solicitud para ${location} ha sido aprobada. La lista ${listName} ya está disponible.`,
+    text: `Tu solicitud para ${location} ha sido aprobada. Te avisaremos en cuanto la lista esté disponible.`,
   });
 }
 

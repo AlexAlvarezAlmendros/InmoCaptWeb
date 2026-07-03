@@ -251,13 +251,6 @@ export interface AdminListRequest extends ListRequest {
   userEmail?: string;
 }
 
-// Approve request input
-export interface ApproveRequestInput {
-  name: string;
-  priceCents: number;
-  currency?: string;
-}
-
 // State counts for properties
 export interface StateCounts {
   new: number;
@@ -318,10 +311,12 @@ export interface AdminUser {
   lastLogin: string | null;
   emailNotificationsOn: boolean;
   isTestUser: boolean;
+  blocked: boolean;
   stripeCustomerId: string | null;
   activeSubscriptionCount: number;
   totalSubscriptionCount: number;
   estimatedMonthlySpendCents: number;
+  creditBalance: number;
 }
 
 export interface AdminUserSubscription {

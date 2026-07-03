@@ -14,6 +14,8 @@ import {
   getAllUsersWithStats,
   getUserWithSubscriptions,
   setUserTestStatus,
+  setUserBlockedStatus,
+  deleteUser,
 } from "../services/userService.js";
 import {
   uploadProperties,
@@ -41,9 +43,14 @@ import {
   bulkDiscontinuedSchema,
   updatePlanSchema,
   updateCreditPackSchema,
+  grantCreditsSchema,
   zodValidate,
 } from "../schemas/validation.js";
-import { getListSubscribersWithNotifications } from "../services/subscriptionService.js";
+import { adminAdjustCredits } from "../services/creditService.js";
+import {
+  getListSubscribersWithNotifications,
+  cancelAllUserStripeSubscriptions,
+} from "../services/subscriptionService.js";
 import {
   notifyListSubscribers,
   sendListRequestApprovedEmail,
@@ -272,11 +279,6 @@ export async function adminRoutes(fastify: FastifyInstance) {
     { preHandler: [authenticate, requireRole("admin")] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { requestId } = request.params as { requestId: string };
-      const body = request.body as {
-        name: string;
-        priceCents: number;
-        currency?: string;
-      };
 
       // Check request exists
       const listRequest = await getListRequestById(requestId);
@@ -290,19 +292,8 @@ export async function adminRoutes(fastify: FastifyInstance) {
           .send({ error: "Request has already been processed" });
       }
 
-      // Validate required fields for creating the list
-      if (!body.name || body.priceCents === undefined) {
-        return reply.status(400).send({
-          error: "Name and priceCents are required to approve a request",
-        });
-      }
-
-      const result = await approveListRequest(requestId, {
-        name: body.name,
-        location: listRequest.location,
-        priceCents: body.priceCents,
-        currency: body.currency || "EUR",
-      });
+      // Approving only marks the request as approved — it does NOT create a list.
+      const result = await approveListRequest(requestId);
 
       // Notify the requesting user
       try {
@@ -310,7 +301,6 @@ export async function adminRoutes(fastify: FastifyInstance) {
         if (requestingUser?.email) {
           await sendListRequestApprovedEmail(
             requestingUser.email,
-            body.name,
             listRequest.location,
           );
         }
@@ -383,10 +373,12 @@ export async function adminRoutes(fastify: FastifyInstance) {
           lastLogin: u.last_login,
           emailNotificationsOn: u.email_notifications_on === 1,
           isTestUser: u.is_test_user === 1,
+          blocked: u.blocked === 1,
           stripeCustomerId: u.stripe_customer_id,
           activeSubscriptionCount: Number(u.active_subscription_count),
           totalSubscriptionCount: Number(u.total_subscription_count),
           estimatedMonthlySpendCents: Number(u.estimated_monthly_spend_cents),
+          creditBalance: Number(u.credit_balance),
         })),
       };
     },
@@ -412,12 +404,14 @@ export async function adminRoutes(fastify: FastifyInstance) {
           lastLogin: user.last_login,
           emailNotificationsOn: user.email_notifications_on === 1,
           isTestUser: user.is_test_user === 1,
+          blocked: user.blocked === 1,
           stripeCustomerId: user.stripe_customer_id,
           activeSubscriptionCount: Number(user.active_subscription_count),
           totalSubscriptionCount: Number(user.total_subscription_count),
           estimatedMonthlySpendCents: Number(
             user.estimated_monthly_spend_cents,
           ),
+          creditBalance: Number(user.credit_balance),
           subscriptions: user.subscriptions.map((s) => ({
             id: s.id,
             listId: s.list_id,
@@ -451,6 +445,109 @@ export async function adminRoutes(fastify: FastifyInstance) {
 
       await setUserTestStatus(userId, isTestUser);
       return { data: { userId, isTestUser } };
+    },
+  );
+
+  // Block or unblock a user's access to the site
+  fastify.patch(
+    "/users/:userId/block",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { userId } = request.params as { userId: string };
+      const { blocked } = request.body as { blocked: boolean };
+
+      if (typeof blocked !== "boolean") {
+        return reply.status(400).send({ error: "blocked must be a boolean" });
+      }
+
+      if (userId === request.user.sub) {
+        return reply
+          .status(400)
+          .send({ error: "No puedes bloquear tu propia cuenta" });
+      }
+
+      await setUserBlockedStatus(userId, blocked);
+
+      // Blocking revokes access, so cancel any active subscriptions to stop billing.
+      let canceledSubscriptions = 0;
+      if (blocked) {
+        try {
+          canceledSubscriptions =
+            await cancelAllUserStripeSubscriptions(userId);
+        } catch (err) {
+          request.log.error(
+            { err },
+            `Failed to cancel subscriptions while blocking user ${userId}`,
+          );
+        }
+      }
+
+      return { data: { userId, blocked, canceledSubscriptions } };
+    },
+  );
+
+  // Permanently delete a user and all their data
+  fastify.delete(
+    "/users/:userId",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { userId } = request.params as { userId: string };
+
+      if (userId === request.user.sub) {
+        return reply
+          .status(400)
+          .send({ error: "No puedes eliminar tu propia cuenta" });
+      }
+
+      const user = await getUserById(userId);
+      if (!user) {
+        return reply.status(404).send({ error: "User not found" });
+      }
+
+      // Cancel active subscriptions in Stripe before wiping the DB rows,
+      // otherwise the customer would keep being billed for a deleted account.
+      try {
+        await cancelAllUserStripeSubscriptions(userId);
+      } catch (err) {
+        request.log.error(
+          { err },
+          `Failed to cancel subscriptions while deleting user ${userId}`,
+        );
+      }
+
+      await deleteUser(userId);
+      return { data: { userId, deleted: true } };
+    },
+  );
+
+  // Grant credits to a user (admin gift / manual adjustment)
+  fastify.post(
+    "/users/:userId/credits",
+    { preHandler: [authenticate, requireRole("admin")] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { userId } = request.params as { userId: string };
+
+      const validation = zodValidate(grantCreditsSchema, request.body);
+      if (!validation.success) {
+        return reply.code(400).send({ error: validation.error });
+      }
+      const { amount, bucket, note } = validation.data;
+
+      const user = await getUserById(userId);
+      if (!user) {
+        return reply.status(404).send({ error: "User not found" });
+      }
+
+      const balance = await adminAdjustCredits({
+        userId,
+        // Default to the topup bucket: admin-granted credits belong to the user
+        // and must not expire on the next plan renewal (unlike plan credits).
+        bucket: bucket ?? "topup",
+        amount,
+        note: note ?? "admin_grant",
+      });
+
+      return { data: { userId, balance } };
     },
   );
 

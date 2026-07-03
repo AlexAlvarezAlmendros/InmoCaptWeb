@@ -87,6 +87,19 @@ export async function authenticate(
       ),
       permissions: (decoded.permissions as string[]) || [],
     };
+
+    // Deny access to users whose access has been revoked by an admin.
+    const blockedResult = await db.execute({
+      sql: "SELECT blocked FROM users WHERE id = ?",
+      args: [request.user.sub],
+    });
+    const blockedRow = blockedResult.rows[0] as
+      | { blocked?: number }
+      | undefined;
+    if (blockedRow && Number(blockedRow.blocked) === 1) {
+      reply.code(403).send({ error: "Access revoked" });
+      return;
+    }
   } catch (error) {
     request.log.error(error, "JWT verification failed");
     reply.code(401).send({ error: "Invalid token" });

@@ -214,6 +214,14 @@ export const updateCreditPackSchema = z.object({
 
 export type UpdateCreditPackInput = z.infer<typeof updateCreditPackSchema>;
 
+export const grantCreditsSchema = z.object({
+  amount: z.number().int().min(1).max(100000),
+  bucket: z.enum(["plan", "topup"]).optional(),
+  note: z.string().max(500).optional(),
+});
+
+export type GrantCreditsInput = z.infer<typeof grantCreditsSchema>;
+
 // ============================================
 // Automation Routes
 // ============================================

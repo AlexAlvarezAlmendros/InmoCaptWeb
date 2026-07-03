@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Badge, Button, ConfirmDialog } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import {
   useAdminListRequests,
@@ -31,9 +30,6 @@ export function AdminRequestsPage() {
   const [rejectingRequest, setRejectingRequest] =
     useState<AdminListRequest | null>(null);
 
-  // Form state for approval
-  const [listName, setListName] = useState("");
-
   // Data fetching
   const {
     data: requests,
@@ -48,23 +44,14 @@ export function AdminRequestsPage() {
   // Handlers
   const handleOpenApprove = (request: AdminListRequest) => {
     setApprovingRequest(request);
-    setListName(`${request.location}`);
   };
 
   const handleApprove = async () => {
-    if (!approvingRequest || !listName) return;
+    if (!approvingRequest) return;
 
-    await approveRequest.mutateAsync({
-      requestId: approvingRequest.id,
-      data: {
-        name: listName,
-        priceCents: 0,
-        currency: "EUR",
-      },
-    });
+    await approveRequest.mutateAsync(approvingRequest.id);
 
     setApprovingRequest(null);
-    setListName("");
   };
 
   const handleReject = async () => {
@@ -257,7 +244,7 @@ export function AdminRequestsPage() {
         isOpen={!!approvingRequest}
         onClose={() => setApprovingRequest(null)}
         title="Aprobar solicitud"
-        description="Configura la nueva lista que se creará"
+        description="La solicitud se marcará como aprobada. No se creará ninguna lista automáticamente."
         size="md"
       >
         <div className="space-y-4">
@@ -281,17 +268,6 @@ export function AdminRequestsPage() {
             </div>
           )}
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Nombre de la lista
-            </label>
-            <Input
-              value={listName}
-              onChange={(e) => setListName(e.target.value)}
-              placeholder="Madrid Centro"
-            />
-          </div>
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="ghost"
@@ -303,10 +279,9 @@ export function AdminRequestsPage() {
             <Button
               variant="accent"
               onClick={handleApprove}
-              disabled={!listName}
               isLoading={approveRequest.isPending}
             >
-              Aprobar y crear lista
+              Aprobar
             </Button>
           </div>
         </div>

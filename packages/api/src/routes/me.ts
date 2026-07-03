@@ -8,7 +8,7 @@ import {
 } from "../services/userService.js";
 import {
   updateSubscriptionByStripeId,
-  getAllUserSubscriptions,
+  cancelAllUserStripeSubscriptions,
 } from "../services/subscriptionService.js";
 import { getUserAccessedListsWithStats } from "../services/listService.js";
 import {
@@ -243,27 +243,11 @@ export async function meRoutes(fastify: FastifyInstance) {
       const userId = request.user.sub;
 
       try {
-        // 1. Cancel all active Stripe subscriptions
-        const allSubs = await getAllUserSubscriptions(userId);
-        const activeSubs = allSubs.filter(
-          (s) =>
-            s.status === "active" &&
-            s.stripe_subscription_id?.startsWith("sub_"),
+        // 1. Cancel all active Stripe subscriptions (per-list + v2 plan)
+        const canceled = await cancelAllUserStripeSubscriptions(userId);
+        fastify.log.info(
+          `Canceled ${canceled} Stripe subscription(s) for account deletion of user ${userId}`,
         );
-
-        for (const sub of activeSubs) {
-          try {
-            await stripe.subscriptions.cancel(sub.stripe_subscription_id);
-            fastify.log.info(
-              `Canceled Stripe subscription ${sub.stripe_subscription_id} for account deletion`,
-            );
-          } catch (err) {
-            // Subscription may already be canceled in Stripe — continue
-            fastify.log.warn(
-              `Failed to cancel Stripe sub ${sub.stripe_subscription_id} during account deletion`,
-            );
-          }
-        }
 
         // 2. Delete all user data from database
         await deleteUser(userId);

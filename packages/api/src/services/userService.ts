@@ -17,12 +17,14 @@ export interface DbUser {
   stripe_customer_id: string | null;
   is_test_user: number;
   trial_used: number;
+  blocked: number;
 }
 
 export interface AdminUserWithStats extends DbUser {
   active_subscription_count: number;
   total_subscription_count: number;
   estimated_monthly_spend_cents: number;
+  credit_balance: number;
 }
 
 export interface AdminUserSubscription {
@@ -150,6 +152,7 @@ export async function ensureUserExists(authUser: AuthUser): Promise<DbUser> {
     stripe_customer_id: null,
     is_test_user: 0,
     trial_used: 1,
+    blocked: 0,
   };
 }
 
@@ -273,13 +276,39 @@ export async function getStripeCustomerId(
 
 /**
  * Delete a user and all their related data from the database.
- * Tables with ON DELETE CASCADE (subscriptions, property_agent_state, list_requests)
- * will be cleaned up automatically, but we delete explicitly for clarity.
+ * PRAGMA foreign_keys may not be enabled in all environments, so we cannot
+ * rely on ON DELETE CASCADE — every user-owned table is cleaned explicitly.
+ * Otherwise a user who re-authenticates with the same Auth0 id would inherit
+ * stale credits, reveals or subscriptions.
  */
 export async function deleteUser(userId: string): Promise<void> {
   await db.batch([
     {
       sql: "DELETE FROM property_agent_state WHERE user_id = ?",
+      args: [userId],
+    },
+    {
+      sql: "DELETE FROM user_property_reveals WHERE user_id = ?",
+      args: [userId],
+    },
+    {
+      sql: "DELETE FROM credit_transactions WHERE user_id = ?",
+      args: [userId],
+    },
+    {
+      sql: "DELETE FROM user_credits WHERE user_id = ?",
+      args: [userId],
+    },
+    {
+      sql: "DELETE FROM user_list_access WHERE user_id = ?",
+      args: [userId],
+    },
+    {
+      sql: "DELETE FROM pending_list_changes WHERE user_id = ?",
+      args: [userId],
+    },
+    {
+      sql: "DELETE FROM user_plan_subscriptions WHERE user_id = ?",
       args: [userId],
     },
     {
@@ -313,6 +342,20 @@ export async function setUserTestStatus(
   });
 }
 
+/**
+ * Block or unblock a user's access to the site.
+ * A blocked user is rejected at the authentication layer.
+ */
+export async function setUserBlockedStatus(
+  userId: string,
+  blocked: boolean,
+): Promise<void> {
+  await db.execute({
+    sql: "UPDATE users SET blocked = ? WHERE id = ?",
+    args: [blocked ? 1 : 0, userId],
+  });
+}
+
 export async function getAllUsersWithStats(): Promise<AdminUserWithStats[]> {
   const result = await db.execute(`
     SELECT
@@ -322,13 +365,16 @@ export async function getAllUsersWithStats(): Promise<AdminUserWithStats[]> {
       u.stripe_customer_id,
       u.last_login,
       u.is_test_user,
+      u.blocked,
       u.created_at,
       COUNT(DISTINCT CASE WHEN s.status = 'active' THEN s.id END) AS active_subscription_count,
       COUNT(DISTINCT s.id) AS total_subscription_count,
-      COALESCE(SUM(CASE WHEN s.status = 'active' THEN l.price_cents ELSE 0 END), 0) AS estimated_monthly_spend_cents
+      COALESCE(SUM(CASE WHEN s.status = 'active' THEN l.price_cents ELSE 0 END), 0) AS estimated_monthly_spend_cents,
+      COALESCE(uc.plan_credits, 0) + COALESCE(uc.topup_credits, 0) AS credit_balance
     FROM users u
     LEFT JOIN subscriptions s ON s.user_id = u.id
     LEFT JOIN lists l ON l.id = s.list_id
+    LEFT JOIN user_credits uc ON uc.user_id = u.id
     GROUP BY u.id
     ORDER BY u.created_at DESC
   `);
@@ -351,13 +397,16 @@ export async function getUserWithSubscriptions(
         u.stripe_customer_id,
         u.last_login,
         u.is_test_user,
+        u.blocked,
         u.created_at,
         COUNT(DISTINCT CASE WHEN s.status = 'active' THEN s.id END) AS active_subscription_count,
         COUNT(DISTINCT s.id) AS total_subscription_count,
-        COALESCE(SUM(CASE WHEN s.status = 'active' THEN l.price_cents ELSE 0 END), 0) AS estimated_monthly_spend_cents
+        COALESCE(SUM(CASE WHEN s.status = 'active' THEN l.price_cents ELSE 0 END), 0) AS estimated_monthly_spend_cents,
+        COALESCE(uc.plan_credits, 0) + COALESCE(uc.topup_credits, 0) AS credit_balance
       FROM users u
       LEFT JOIN subscriptions s ON s.user_id = u.id
       LEFT JOIN lists l ON l.id = s.list_id
+      LEFT JOIN user_credits uc ON uc.user_id = u.id
       WHERE u.id = ?
       GROUP BY u.id
     `,

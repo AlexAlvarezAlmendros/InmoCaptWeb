@@ -114,33 +114,17 @@ export async function getListRequestById(
 }
 
 /**
- * Approve a list request and create the associated list
+ * Approve a list request. This only marks the request as approved and does
+ * NOT create a list — the admin creates and associates the list separately
+ * from the Lists section.
  */
 export async function approveListRequest(
   requestId: string,
-  listData: {
-    name: string;
-    location: string;
-    priceCents: number;
-    currency: string;
-  },
-): Promise<{ request: ListRequest; listId: string }> {
-  // Import here to avoid circular dependency
-  const { createList } = await import("./listService.js");
+): Promise<ListRequest> {
+  await updateListRequestStatus(requestId, "approved");
 
-  // Create the list
-  const newList = await createList(listData);
-
-  // Update the request status
-  await updateListRequestStatus(requestId, "approved", newList.id);
-
-  // Get updated request
   const updatedRequest = await getListRequestById(requestId);
-
-  return {
-    request: updatedRequest!,
-    listId: newList.id,
-  };
+  return updatedRequest!;
 }
 
 /**

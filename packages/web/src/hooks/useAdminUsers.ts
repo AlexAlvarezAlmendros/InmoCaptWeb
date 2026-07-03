@@ -55,3 +55,63 @@ export function useToggleTestUser() {
     },
   });
 }
+
+/**
+ * Block or unblock a user's access to the site
+ */
+export function useToggleUserBlocked() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ userId, blocked }: { userId: string; blocked: boolean }) =>
+      api.patch(`/admin/users/${userId}/block`, { blocked }),
+    onSuccess: (_data, { userId }) => {
+      queryClient.invalidateQueries({ queryKey: adminUsersKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: adminUsersKeys.detail(userId),
+      });
+    },
+  });
+}
+
+/**
+ * Permanently delete a user and all their data
+ */
+export function useDeleteUser() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userId: string) => api.delete(`/admin/users/${userId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminUsersKeys.all });
+    },
+  });
+}
+
+/**
+ * Grant credits to a user (admin gift / manual adjustment)
+ */
+export function useGrantCredits() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      userId,
+      amount,
+      note,
+    }: {
+      userId: string;
+      amount: number;
+      note?: string;
+    }) => api.post(`/admin/users/${userId}/credits`, { amount, note }),
+    onSuccess: (_data, { userId }) => {
+      queryClient.invalidateQueries({ queryKey: adminUsersKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: adminUsersKeys.detail(userId),
+      });
+    },
+  });
+}

@@ -6,6 +6,9 @@ import {
   useAdminUsers,
   useAdminUser,
   useToggleTestUser,
+  useToggleUserBlocked,
+  useDeleteUser,
+  useGrantCredits,
 } from "@/hooks/useAdminUsers";
 import type {
   AdminUser,
@@ -42,6 +45,18 @@ function UserDetailModal({
   onClose: () => void;
 }) {
   const { data: user, isLoading } = useAdminUser(userId);
+  const toggleBlocked = useToggleUserBlocked();
+  const deleteUser = useDeleteUser();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleToggleBlocked = () => {
+    if (!user) return;
+    toggleBlocked.mutate({ userId: user.id, blocked: !user.blocked });
+  };
+
+  const handleDelete = () => {
+    deleteUser.mutate(userId, { onSuccess: onClose });
+  };
 
   return (
     <Modal isOpen onClose={onClose} title="Detalle de usuario" size="2xl">
@@ -101,6 +116,14 @@ function UserDetailModal({
                 </dt>
                 <dd className="mt-0.5 font-semibold text-slate-900 dark:text-white">
                   {formatPrice(user.estimatedMonthlySpendCents)}/mes
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                  Créditos
+                </dt>
+                <dd className="mt-0.5 font-semibold text-slate-900 dark:text-white">
+                  {user.creditBalance}
                 </dd>
               </div>
               {user.stripeCustomerId && (
@@ -185,8 +208,161 @@ function UserDetailModal({
               </div>
             )}
           </div>
+
+          {/* Danger zone — access & deletion */}
+          <div className="rounded-lg border border-red-200 bg-red-50/50 p-4 dark:border-red-900/50 dark:bg-red-900/10">
+            <h3 className="text-sm font-semibold text-red-700 dark:text-red-400">
+              Zona de peligro
+            </h3>
+            {user.blocked && (
+              <p className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
+                El acceso de este usuario está revocado. No puede entrar en la
+                plataforma.
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button
+                variant={user.blocked ? "secondary" : "danger"}
+                size="sm"
+                onClick={handleToggleBlocked}
+                isLoading={toggleBlocked.isPending}
+              >
+                {user.blocked ? "Restaurar acceso" : "Quitar acceso"}
+              </Button>
+
+              {confirmDelete ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-600 dark:text-slate-400">
+                    ¿Eliminar permanentemente?
+                  </span>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={handleDelete}
+                    isLoading={deleteUser.isPending}
+                  >
+                    Sí, eliminar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmDelete(false)}
+                    disabled={deleteUser.isPending}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmDelete(true)}
+                  className="text-red-600 hover:text-red-700 dark:text-red-400"
+                >
+                  Eliminar usuario
+                </Button>
+              )}
+            </div>
+            {(toggleBlocked.isError || deleteUser.isError) && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {(toggleBlocked.error as Error)?.message ??
+                  (deleteUser.error as Error)?.message ??
+                  "Se ha producido un error."}
+              </p>
+            )}
+          </div>
         </div>
       )}
+    </Modal>
+  );
+}
+
+// ─── Grant credits modal ─────────────────────────────────────────────────────
+
+function GrantCreditsModal({
+  user,
+  onClose,
+}: {
+  user: AdminUser;
+  onClose: () => void;
+}) {
+  const grantCredits = useGrantCredits();
+  const [amount, setAmount] = useState<number>(10);
+  const [note, setNote] = useState("");
+
+  const handleSubmit = () => {
+    if (amount < 1) return;
+    grantCredits.mutate(
+      { userId: user.id, amount, note: note.trim() || undefined },
+      { onSuccess: onClose },
+    );
+  };
+
+  return (
+    <Modal isOpen onClose={onClose} title="Añadir créditos" size="md">
+      <div className="space-y-4">
+        <div className="rounded-lg border border-border-light bg-slate-50 p-3 text-sm dark:border-border-dark dark:bg-slate-900/50">
+          <div className="text-slate-600 dark:text-slate-400">{user.email}</div>
+          <div className="mt-0.5 text-slate-500">
+            Saldo actual:{" "}
+            <span className="font-semibold text-slate-900 dark:text-white">
+              {user.creditBalance} créditos
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Créditos a añadir
+          </label>
+          <input
+            type="number"
+            min={1}
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            className="w-full rounded-md border border-border-light bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none dark:border-border-dark dark:bg-slate-900 dark:text-white"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Nota (opcional)
+          </label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Motivo del ajuste"
+            maxLength={500}
+            className="w-full rounded-md border border-border-light bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none dark:border-border-dark dark:bg-slate-900 dark:text-white"
+          />
+        </div>
+
+        {grantCredits.isError && (
+          <p className="text-xs text-red-600 dark:text-red-400">
+            {(grantCredits.error as Error)?.message ??
+              "No se han podido añadir los créditos."}
+          </p>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            disabled={grantCredits.isPending}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleSubmit}
+            isLoading={grantCredits.isPending}
+            disabled={amount < 1}
+          >
+            Añadir créditos
+          </Button>
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -196,6 +372,7 @@ function UserDetailModal({
 export function AdminUsersPage() {
   const { data: users, isLoading, error } = useAdminUsers();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [creditsUser, setCreditsUser] = useState<AdminUser | null>(null);
   const toggleTestUser = useToggleTestUser();
 
   const realUsers = users?.filter((u: AdminUser) => !u.isTestUser) ?? [];
@@ -355,6 +532,9 @@ export function AdminUsersPage() {
                     Gasto mensual
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Créditos
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
                     Notif.
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
@@ -376,6 +556,9 @@ export function AdminUsersPage() {
                         </span>
                         {user.isTestUser && (
                           <Badge variant="warning">Test</Badge>
+                        )}
+                        {user.blocked && (
+                          <Badge variant="error">Sin acceso</Badge>
                         )}
                       </div>
                       {user.stripeCustomerId && (
@@ -431,6 +614,11 @@ export function AdminUsersPage() {
                       )}
                     </td>
 
+                    {/* Credits */}
+                    <td className="px-4 py-3 text-center text-sm font-medium text-slate-900 dark:text-white">
+                      {user.creditBalance}
+                    </td>
+
                     {/* Notifications */}
                     <td className="px-4 py-3 text-center">
                       <Badge
@@ -466,6 +654,14 @@ export function AdminUsersPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => setCreditsUser(user)}
+                          className="text-primary"
+                        >
+                          + Créditos
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setSelectedUserId(user.id)}
                         >
                           Ver detalle
@@ -485,6 +681,14 @@ export function AdminUsersPage() {
         <UserDetailModal
           userId={selectedUserId}
           onClose={() => setSelectedUserId(null)}
+        />
+      )}
+
+      {/* Grant credits modal */}
+      {creditsUser && (
+        <GrantCreditsModal
+          user={creditsUser}
+          onClose={() => setCreditsUser(null)}
         />
       )}
     </div>

@@ -1,4 +1,5 @@
 import { db } from "../config/database.js";
+import { stripe } from "../config/stripe.js";
 
 export interface CreateSubscriptionParams {
   userId: string;
@@ -194,6 +195,68 @@ export async function getAllUserSubscriptions(userId: string) {
     current_period_end: string | null;
     created_at: string;
   }>;
+}
+
+/**
+ * Cancel every active Stripe subscription a user has — both per-list
+ * subscriptions and the v2 plan subscription — and mark them canceled in the DB.
+ *
+ * Used when an admin blocks or deletes a user: their access is revoked, so we
+ * must stop billing them. Stripe errors are swallowed per-subscription (it may
+ * already be canceled) so one failure never leaves other subs untouched.
+ * Returns the number of Stripe subscriptions that were canceled.
+ */
+export async function cancelAllUserStripeSubscriptions(
+  userId: string,
+): Promise<number> {
+  let canceledCount = 0;
+
+  // 1. Per-list subscriptions (subscriptions table)
+  const listSubs = await db.execute({
+    sql: "SELECT stripe_subscription_id FROM subscriptions WHERE user_id = ? AND status != 'canceled'",
+    args: [userId],
+  });
+
+  // 2. v2 plan subscription (user_plan_subscriptions table)
+  const planSubs = await db.execute({
+    sql: "SELECT stripe_subscription_id FROM user_plan_subscriptions WHERE user_id = ? AND status != 'canceled'",
+    args: [userId],
+  });
+
+  const stripeIds = [...listSubs.rows, ...planSubs.rows]
+    .map(
+      (r) =>
+        (r as unknown as { stripe_subscription_id: string | null })
+          .stripe_subscription_id,
+    )
+    .filter((id): id is string => !!id && id.startsWith("sub_"));
+
+  for (const stripeId of stripeIds) {
+    try {
+      await stripe.subscriptions.cancel(stripeId);
+      canceledCount++;
+    } catch (err) {
+      // Already canceled or missing in Stripe — continue with the rest.
+      console.warn(
+        `[Subscriptions] Failed to cancel Stripe subscription ${stripeId} for user ${userId}:`,
+        err,
+      );
+    }
+  }
+
+  // Reflect cancellation in our DB regardless of Stripe outcome.
+  await db.batch([
+    {
+      sql: "UPDATE subscriptions SET status = 'canceled' WHERE user_id = ? AND status != 'canceled'",
+      args: [userId],
+    },
+    {
+      sql: "UPDATE user_plan_subscriptions SET status = 'canceled' WHERE user_id = ? AND status != 'canceled'",
+      args: [userId],
+    },
+  ]);
+
+  return canceledCount;
 }
 
 /**

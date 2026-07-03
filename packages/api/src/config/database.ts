@@ -41,6 +41,10 @@ export async function runMigrations(): Promise<void> {
       description: "Add trial_used column to users (subscription model v2)",
     },
     {
+      sql: "ALTER TABLE users ADD COLUMN blocked INTEGER DEFAULT 0",
+      description: "Add blocked column to users (revoke site access)",
+    },
+    {
       sql: "ALTER TABLE user_plan_subscriptions ADD COLUMN pending_plan_id TEXT REFERENCES plans(id)",
       description: "Add pending_plan_id for scheduled plan downgrades",
     },

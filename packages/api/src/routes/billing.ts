@@ -8,6 +8,7 @@ import {
   updateStripeCustomerId,
   ensureUserExists,
   getUserByStripeCustomerId,
+  getUserById,
 } from "../services/userService.js";
 import {
   createSubscription,
@@ -22,6 +23,7 @@ import { getListById } from "../services/listService.js";
 import {
   sendSubscriptionActivatedEmail,
   sendSubscriptionCancelledEmail,
+  sendAdminPaymentEmail,
 } from "../services/emailService.js";
 import {
   getPlanById,
@@ -496,6 +498,26 @@ export async function billingRoutes(fastify: FastifyInstance) {
             fastify.log.info(
               `Plan subscription activated: user=${userId}, plan=${planId}, stripeSub=${subscriptionId}`,
             );
+
+            // Notify admin of the payment (fire-and-forget)
+            try {
+              const buyerEmail =
+                session.customer_details?.email ||
+                (await getUserById(userId))?.email ||
+                null;
+              await sendAdminPaymentEmail({
+                userEmail: buyerEmail,
+                kind: "plan",
+                description: `Plan: ${plan.name}`,
+                amountCents: session.amount_total,
+                currency: session.currency,
+              });
+            } catch (emailErr) {
+              fastify.log.warn(
+                { err: emailErr },
+                "Failed to send admin plan-payment notification",
+              );
+            }
             break;
           }
 
@@ -524,6 +546,26 @@ export async function billingRoutes(fastify: FastifyInstance) {
             fastify.log.info(
               `Credit pack granted: user=${userId}, pack=${packId}, credits=${credits}`,
             );
+
+            // Notify admin of the payment (fire-and-forget)
+            try {
+              const buyerEmail =
+                session.customer_details?.email ||
+                (await getUserById(userId))?.email ||
+                null;
+              await sendAdminPaymentEmail({
+                userEmail: buyerEmail,
+                kind: "credits",
+                description: `${credits} créditos`,
+                amountCents: session.amount_total,
+                currency: session.currency,
+              });
+            } catch (emailErr) {
+              fastify.log.warn(
+                { err: emailErr },
+                "Failed to send admin credit-payment notification",
+              );
+            }
             break;
           }
 

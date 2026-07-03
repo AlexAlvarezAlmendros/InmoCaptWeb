@@ -5,6 +5,7 @@ import {
   getListRequestsByUser,
 } from "../services/listRequestService.js";
 import { ensureUserExists } from "../services/userService.js";
+import { sendAdminListRequestEmail } from "../services/emailService.js";
 import { zodValidate, createListRequestSchema } from "../schemas/validation.js";
 
 export async function listRequestsRoutes(fastify: FastifyInstance) {
@@ -27,6 +28,18 @@ export async function listRequestsRoutes(fastify: FastifyInstance) {
       location: location.trim(),
       notes: notes?.trim(),
     });
+
+    // Notify admin of the new list request (fire-and-forget)
+    sendAdminListRequestEmail(
+      request.user.email || null,
+      location.trim(),
+      notes?.trim(),
+    ).catch((err) =>
+      request.log.warn(
+        { err },
+        "Failed to send admin list-request notification",
+      ),
+    );
 
     return {
       message: "List request created successfully",

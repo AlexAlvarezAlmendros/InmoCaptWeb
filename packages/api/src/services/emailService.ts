@@ -249,6 +249,143 @@ export async function sendListRequestRejectedEmail(
   });
 }
 
+// ─── Admin Notifications ──────────────────────────────────────────
+
+/**
+ * Format an amount in cents into a human-readable currency string.
+ */
+function formatCents(
+  amountCents: number | null | undefined,
+  currency: string | null | undefined,
+): string {
+  if (amountCents == null) return "—";
+  return `${(amountCents / 100).toFixed(2)} ${(currency || "eur").toUpperCase()}`;
+}
+
+/**
+ * Send a notification to the configured admin address.
+ * No-op (returns false) if ADMIN_EMAIL is not configured.
+ */
+async function sendAdminNotification(
+  subject: string,
+  content: string,
+  text: string,
+): Promise<boolean> {
+  if (!env.ADMIN_EMAIL) {
+    console.warn(
+      "[Email] ADMIN_EMAIL not configured, skipping admin notification:",
+      subject,
+    );
+    return false;
+  }
+
+  return sendEmail({
+    to: env.ADMIN_EMAIL,
+    subject,
+    html: emailLayout(content),
+    text,
+  });
+}
+
+/**
+ * Renders a labelled detail row for admin emails.
+ */
+function detailRow(label: string, value: string): string {
+  return `<p style="color: #475569; font-size: 15px; line-height: 1.5; margin: 0 0 8px;">
+    <span style="color: #94a3b8;">${label}:</span> <strong>${value}</strong>
+  </p>`;
+}
+
+/**
+ * Admin notification: a new user account has been created.
+ */
+export async function sendAdminNewUserEmail(
+  userEmail: string,
+): Promise<boolean> {
+  const safeEmail = escapeHtml(userEmail);
+  return sendAdminNotification(
+    `Nueva cuenta registrada: ${userEmail}`,
+    `
+      <h1 style="color: #1E3A5F; font-size: 22px; margin: 0 0 16px;">
+        Nueva cuenta registrada
+      </h1>
+      <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+        Un nuevo usuario se ha registrado en InmoCapt.
+      </p>
+      ${detailRow("Email", safeEmail)}
+    `,
+    `Nueva cuenta registrada en InmoCapt: ${userEmail}`,
+  );
+}
+
+/**
+ * Admin notification: a user has requested a new list.
+ */
+export async function sendAdminListRequestEmail(
+  userEmail: string | null,
+  location: string,
+  notes?: string | null,
+): Promise<boolean> {
+  const safeEmail = escapeHtml(userEmail || "desconocido");
+  const safeLocation = escapeHtml(location);
+  const safeNotes = notes ? escapeHtml(notes) : null;
+
+  return sendAdminNotification(
+    `Nueva solicitud de lista: ${location}`,
+    `
+      <h1 style="color: #1E3A5F; font-size: 22px; margin: 0 0 16px;">
+        Nueva solicitud de lista
+      </h1>
+      <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+        Un usuario ha solicitado una nueva lista.
+      </p>
+      ${detailRow("Usuario", safeEmail)}
+      ${detailRow("Ubicación", safeLocation)}
+      ${safeNotes ? detailRow("Notas", safeNotes) : ""}
+      ${primaryButton("Revisar solicitudes", `${env.FRONTEND_URL}/app/admin/requests`)}
+    `,
+    `Nueva solicitud de lista en ${location} de ${userEmail || "usuario desconocido"}.${
+      notes ? ` Notas: ${notes}` : ""
+    }`,
+  );
+}
+
+/**
+ * Admin notification: a user has completed a payment (plan or credit pack).
+ */
+export async function sendAdminPaymentEmail(params: {
+  userEmail: string | null;
+  kind: "plan" | "credits";
+  description: string;
+  amountCents?: number | null;
+  currency?: string | null;
+}): Promise<boolean> {
+  const { userEmail, kind, description, amountCents, currency } = params;
+  const safeEmail = escapeHtml(userEmail || "desconocido");
+  const safeDescription = escapeHtml(description);
+  const kindLabel = kind === "plan" ? "Suscripción a plan" : "Compra de créditos";
+  const amount = formatCents(amountCents, currency);
+
+  return sendAdminNotification(
+    `Nuevo pago (${kindLabel}): ${amount}`,
+    `
+      <h1 style="color: #1E3A5F; font-size: 22px; margin: 0 0 16px;">
+        Nuevo pago recibido
+      </h1>
+      <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 20px;">
+        Se ha completado un pago en InmoCapt.
+      </p>
+      ${detailRow("Tipo", kindLabel)}
+      ${detailRow("Detalle", safeDescription)}
+      ${detailRow("Importe", amount)}
+      ${detailRow("Usuario", safeEmail)}
+    `,
+    `Nuevo pago en InmoCapt (${kindLabel}): ${description}, importe ${amount}, usuario ${
+      userEmail || "desconocido"
+    }.`,
+  );
+}
+
 // ─── Bulk Notification Helper ─────────────────────────────────────
 
 /**

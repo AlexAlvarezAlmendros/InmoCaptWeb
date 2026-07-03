@@ -1,6 +1,6 @@
 import { db } from "../config/database.js";
 import type { AuthUser } from "../plugins/auth.js";
-import { sendWelcomeEmail } from "./emailService.js";
+import { sendWelcomeEmail, sendAdminNewUserEmail } from "./emailService.js";
 import {
   createTrialForUser,
   getPlanById,
@@ -118,6 +118,11 @@ export async function ensureUserExists(authUser: AuthUser): Promise<DbUser> {
       console.warn("[Email] Failed to send welcome email:", err),
     );
   }
+
+  // Notify admin of the new account (fire-and-forget)
+  sendAdminNewUserEmail(authUser.email || "").catch((err) =>
+    console.warn("[Email] Failed to send admin new-user notification:", err),
+  );
 
   // Provision the free trial (plan=trial, 3 credits, 7 days)
   try {

@@ -173,9 +173,6 @@ function PropertyRow({
           <span className="text-slate-400">-</span>
         )}
       </td>
-      <td className="px-3 py-3 text-sm text-slate-600 dark:text-slate-400">
-        {property.ownerName || "-"}
-      </td>
       <td className="whitespace-nowrap px-3 py-3 text-sm">
         <select
           value={property.state}
@@ -416,10 +413,7 @@ function PropertyCard({
       </div>
 
       {/* Contact row */}
-      <div className="mb-2 flex items-center justify-between text-sm">
-        <span className="text-slate-600 dark:text-slate-400">
-          {property.ownerName || "-"}
-        </span>
+      <div className="mb-2 flex items-center justify-end text-sm">
         {property.phone ? (
           <a
             href={`tel:${property.phone}`}
@@ -951,9 +945,6 @@ export function ListDetailPage() {
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       Teléfono
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                      Propietario
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                       Estado

@@ -200,6 +200,130 @@ export async function uploadProperties(
   };
 }
 
+export interface UpdateResult {
+  success: boolean;
+  listId: string;
+  stats: {
+    total: number;
+    updated: number;
+    duplicates: number;
+    notFound: number;
+    errors: number;
+  };
+  notFound: string[];
+  errors: Array<{
+    index: number;
+    message: string;
+  }>;
+}
+
+/**
+ * Update existing properties in a list, matching by sourceUrl.
+ * Properties whose sourceUrl is not found are reported in `notFound`
+ * and never inserted (update-only, no upsert).
+ */
+export async function updateProperties(
+  listId: string,
+  properties: PropertyInput[],
+): Promise<UpdateResult> {
+  const stats = {
+    total: properties.length,
+    updated: 0,
+    duplicates: 0,
+    notFound: 0,
+    errors: 0,
+  };
+  const notFound: string[] = [];
+  const errors: Array<{ index: number; message: string }> = [];
+
+  // Get existing properties by sourceUrl to know what we can update
+  const existingResult = await db.execute({
+    sql: "SELECT id, source_url FROM properties WHERE list_id = ? AND source_url IS NOT NULL",
+    args: [listId],
+  });
+
+  const existingByUrl = new Map<string, string>();
+  for (const row of existingResult.rows) {
+    if (row.source_url) {
+      existingByUrl.set(row.source_url as string, row.id as string);
+    }
+  }
+
+  // Track URLs already handled in this batch to skip in-batch duplicates
+  const batchUrls = new Set<string>();
+
+  for (let i = 0; i < properties.length; i++) {
+    const prop = properties[i];
+
+    try {
+      const normalizedUrl = prop.sourceUrl?.trim() || null;
+
+      // Without a sourceUrl we cannot match an existing property
+      if (!normalizedUrl) {
+        stats.notFound++;
+        notFound.push(`(index ${i}: missing sourceUrl)`);
+        continue;
+      }
+
+      // Skip duplicates within the current batch
+      if (batchUrls.has(normalizedUrl)) {
+        stats.duplicates++;
+        continue;
+      }
+      batchUrls.add(normalizedUrl);
+
+      const existingId = existingByUrl.get(normalizedUrl);
+      if (!existingId) {
+        stats.notFound++;
+        notFound.push(normalizedUrl);
+        continue;
+      }
+
+      const normalizedPhone = normalizePhone(prop.phone);
+      const rawPayloadJson = prop.rawPayload
+        ? JSON.stringify(prop.rawPayload)
+        : null;
+
+      await db.execute({
+        sql: `
+          UPDATE properties
+          SET price = ?, m2 = ?, bedrooms = ?, phone = ?, owner_name = ?, raw_payload = ?
+          WHERE id = ?
+        `,
+        args: [
+          prop.price,
+          prop.m2 ?? null,
+          prop.bedrooms ?? null,
+          normalizedPhone,
+          prop.ownerName?.trim() ?? null,
+          rawPayloadJson,
+          existingId,
+        ],
+      });
+      stats.updated++;
+    } catch (error) {
+      stats.errors++;
+      errors.push({
+        index: i,
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  // Touch the list timestamp if anything actually changed
+  if (stats.updated > 0) {
+    await updateListTimestamp(listId);
+  }
+
+  return {
+    success: stats.errors === 0,
+    listId,
+    stats,
+    notFound,
+    errors,
+  };
+}
+
 /**
  * Get properties for a list with pagination
  */

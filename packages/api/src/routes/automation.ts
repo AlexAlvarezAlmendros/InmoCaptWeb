@@ -9,6 +9,7 @@ import {
 } from "../services/listService.js";
 import {
   uploadProperties,
+  updateProperties,
   isIdealistaFormat,
   isFotocasaFormat,
   parseIdealistaUpload,
@@ -289,6 +290,155 @@ export async function automationRoutes(fastify: FastifyInstance) {
         listCreated,
         stats: result.stats,
         notifications: emailStats,
+        errors: result.errors.length > 0 ? result.errors : undefined,
+      };
+    },
+  );
+
+  /**
+   * POST /automation/update
+   *
+   * Update EXISTING properties in a list via API key authentication.
+   * Properties are matched by their sourceUrl (same key used by /upload
+   * for deduplication). Unlike /upload, nothing new is ever inserted:
+   * any property whose sourceUrl is not found is skipped and reported
+   * in the `notFound` array.
+   *
+   * Supports the same three formats as /upload: simplified, Idealista,
+   * and Fotocasa (auto-detected).
+   *
+   * Headers:
+   * - X-API-Key: Your automation API key
+   *
+   * List identification (one of):
+   * - listId: Direct UUID of the list
+   * - listName + location: Existing list (never created here)
+   * - ubicacion (Fotocasa): Used as both listName and location
+   *
+   * Returns 404 if the target list does not exist.
+   */
+  fastify.post(
+    "/update",
+    { preHandler: [authenticateApiKey] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const body = request.body as AutomationUploadBody;
+
+      let listId: string;
+      let properties: PropertyInput[];
+
+      // Detect format: Fotocasa first, then Idealista, then simplified
+      const isFotocasa = isFotocasaFormat(body);
+      const isIdealista = !isFotocasa && isIdealistaFormat(body);
+
+      if (isFotocasa) {
+        const validation = zodValidate(automationUploadFotocasaSchema, body);
+        if (!validation.success) {
+          return reply.status(400).send({
+            error: "Validation failed",
+            details: validation.error,
+          });
+        }
+
+        properties = parseFotocasaUpload({
+          ubicacion: validation.data.ubicacion,
+          viviendas: validation.data.viviendas,
+        });
+
+        const ubicacion = validation.data.ubicacion;
+
+        if (validation.data.listId) {
+          const list = await getListById(validation.data.listId);
+          if (!list) {
+            return reply.status(404).send({ error: "List not found" });
+          }
+          listId = list.id;
+        } else {
+          const list = await findListByNameAndLocation(ubicacion, ubicacion);
+          if (!list) {
+            return reply.status(404).send({ error: "List not found", ubicacion });
+          }
+          listId = list.id;
+        }
+      } else if (isIdealista) {
+        const validation = zodValidate(automationUploadIdealistaSchema, body);
+        if (!validation.success) {
+          return reply.status(400).send({
+            error: "Validation failed",
+            details: validation.error,
+          });
+        }
+
+        properties = parseIdealistaUpload({
+          viviendas: validation.data.viviendas,
+        });
+
+        if (validation.data.listId) {
+          const list = await getListById(validation.data.listId);
+          if (!list) {
+            return reply.status(404).send({ error: "List not found" });
+          }
+          listId = list.id;
+        } else if (validation.data.listName && validation.data.location) {
+          const list = await findListByNameAndLocation(
+            validation.data.listName,
+            validation.data.location,
+          );
+          if (!list) {
+            return reply.status(404).send({ error: "List not found" });
+          }
+          listId = list.id;
+        } else {
+          return reply.status(400).send({
+            error: "Either listId or (listName + location) is required",
+          });
+        }
+      } else {
+        const validation = zodValidate(automationUploadSimplifiedSchema, body);
+        if (!validation.success) {
+          return reply.status(400).send({
+            error: "Validation failed",
+            details: validation.error,
+          });
+        }
+
+        properties = validation.data.properties;
+
+        if (validation.data.listId) {
+          const list = await getListById(validation.data.listId);
+          if (!list) {
+            return reply.status(404).send({ error: "List not found" });
+          }
+          listId = list.id;
+        } else if (validation.data.listName && validation.data.location) {
+          const list = await findListByNameAndLocation(
+            validation.data.listName,
+            validation.data.location,
+          );
+          if (!list) {
+            return reply.status(404).send({ error: "List not found" });
+          }
+          listId = list.id;
+        } else {
+          return reply.status(400).send({
+            error: "Either listId or (listName + location) is required",
+          });
+        }
+      }
+
+      // Update existing properties (no inserts)
+      const result = await updateProperties(listId, properties);
+
+      request.log.info({
+        msg: "Automation update completed",
+        listId,
+        stats: result.stats,
+      });
+
+      return {
+        success: true,
+        listId,
+        stats: result.stats,
+        notFound: result.notFound.length > 0 ? result.notFound : undefined,
         errors: result.errors.length > 0 ? result.errors : undefined,
       };
     },

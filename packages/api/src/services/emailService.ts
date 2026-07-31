@@ -247,6 +247,55 @@ export async function sendListRequestRejectedEmail(
   });
 }
 
+/**
+ * Sent a few days before the first paid charge of a subscription whose first
+ * month was free through a promo code.
+ */
+export async function sendFirstChargeReminderEmail(params: {
+  to: string;
+  planName: string;
+  priceCents: number;
+  currency: string;
+  chargeDate: Date;
+}): Promise<boolean> {
+  const safePlan = escapeHtml(params.planName);
+  const amount = `${(params.priceCents / 100).toFixed(2).replace(".", ",")} ${
+    (params.currency || "eur").toUpperCase() === "EUR"
+      ? "€"
+      : (params.currency || "").toUpperCase()
+  }`;
+  const formattedDate = params.chargeDate.toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Madrid",
+  });
+
+  return sendEmail({
+    to: params.to,
+    subject: `Tu mes gratis de ${params.planName} termina el ${formattedDate}`,
+    html: emailLayout(`
+      <h1 style="color: #1E3A5F; font-size: 24px; margin: 0 0 16px;">
+        Tu primer mes gratuito está a punto de terminar
+      </h1>
+      <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 16px;">
+        Has disfrutado del plan <strong>${safePlan}</strong> gratis durante el primer mes.
+        El <strong>${formattedDate}</strong> se renovará automáticamente y se cargará
+        <strong>${amount}</strong> en el método de pago que registraste.
+      </p>
+      <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+        No tienes que hacer nada: tu acceso a las listas y tus créditos mensuales continúan sin interrupción.
+        Si prefieres no continuar, puedes cancelar antes de esa fecha desde tu cuenta.
+      </p>
+      ${primaryButton("Gestionar mi plan", `${env.FRONTEND_URL}/app/plans`)}
+      <p style="color: #94a3b8; font-size: 13px; margin: 16px 0 0;">
+        Revisa que tu tarjeta siga vigente para evitar que la renovación falle.
+      </p>
+    `),
+    text: `Tu primer mes gratuito del plan ${params.planName} termina el ${formattedDate}. Ese día se renovará automáticamente y se cargarán ${amount}. Puedes gestionar o cancelar tu plan en: ${env.FRONTEND_URL}/app/plans`,
+  });
+}
+
 // ─── Admin Notifications ──────────────────────────────────────────
 
 /**

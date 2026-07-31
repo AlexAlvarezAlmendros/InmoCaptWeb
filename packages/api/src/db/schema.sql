@@ -124,6 +124,8 @@ CREATE TABLE IF NOT EXISTS user_plan_subscriptions (
   current_period_start TEXT,
   current_period_end TEXT,
   pending_plan_id TEXT REFERENCES plans(id), -- set when downgrade is scheduled
+  first_month_free INTEGER DEFAULT 0,        -- 1 = first invoice fully discounted (promo), so next charge is the first real one
+  renewal_reminder_sent_at TEXT,             -- when the "first charge is coming" email was sent
   created_at TEXT DEFAULT (datetime('now')),
   UNIQUE(user_id)
 );

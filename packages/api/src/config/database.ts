@@ -48,6 +48,15 @@ export async function runMigrations(): Promise<void> {
       sql: "ALTER TABLE user_plan_subscriptions ADD COLUMN pending_plan_id TEXT REFERENCES plans(id)",
       description: "Add pending_plan_id for scheduled plan downgrades",
     },
+    {
+      sql: "ALTER TABLE user_plan_subscriptions ADD COLUMN first_month_free INTEGER DEFAULT 0",
+      description:
+        "Add first_month_free flag (promo coupon covered the first invoice)",
+    },
+    {
+      sql: "ALTER TABLE user_plan_subscriptions ADD COLUMN renewal_reminder_sent_at TEXT",
+      description: "Add renewal_reminder_sent_at for the first-charge reminder",
+    },
     // ── Subscription model v2: create tables that may not exist yet ──────────
     {
       sql: `CREATE TABLE IF NOT EXISTS plans (

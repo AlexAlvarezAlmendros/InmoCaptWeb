@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { authenticateApiKey } from "../plugins/auth.js";
+import { authenticateApiKey, authenticateJobTrigger } from "../plugins/auth.js";
 import { db } from "../config/database.js";
 import {
   getListById,
@@ -33,8 +33,11 @@ import {
   sendListUpdatedEmail,
   sendListRequestApprovedEmail,
   sendListRequestRejectedEmail,
+  sendFirstChargeReminderEmail,
   notifyListSubscribers,
 } from "../services/emailService.js";
+import { runTrialExpirationSweep } from "../services/trialExpirationJob.js";
+import { runRenewalReminderSweep } from "../services/renewalReminderJob.js";
 import { getListSubscribersWithNotifications } from "../services/subscriptionService.js";
 
 interface AutomationUploadBody {
@@ -652,6 +655,19 @@ export async function automationRoutes(fastify: FastifyInstance) {
         template: "list_request_rejected",
         success: await sendListRequestRejectedEmail(email, "Lleida Capital"),
       });
+      await delay(600);
+
+      // 7. First charge reminder (end of the free promo month)
+      results.push({
+        template: "first_charge_reminder",
+        success: await sendFirstChargeReminderEmail({
+          to: email,
+          planName: "Starter",
+          priceCents: 2900,
+          currency: "EUR",
+          chargeDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+        }),
+      });
 
       const sent = results.filter((r) => r.success).length;
       const failed = results.filter((r) => !r.success).length;
@@ -662,5 +678,44 @@ export async function automationRoutes(fastify: FastifyInstance) {
         results,
       };
     },
+  );
+
+  /**
+   * POST|GET /automation/run-jobs
+   *
+   * Runs the scheduled sweeps (trial expiration + first-charge reminders).
+   * Needed on serverless deployments, where the in-process interval jobs of
+   * server.ts never run. Called by the Vercel cron defined in vercel.json,
+   * and safe to call manually — both sweeps are idempotent.
+   *
+   * Auth: X-API-Key, or `Authorization: Bearer <CRON_SECRET>` (Vercel crons).
+   */
+  const runJobsHandler = async (
+    request: FastifyRequest,
+    _reply: FastifyReply,
+  ) => {
+    const trial = await runTrialExpirationSweep();
+    const reminders = await runRenewalReminderSweep();
+
+    request.log.info(
+      `[run-jobs] expired=${trial.expiredCount} reminders_sent=${reminders.sent} reminders_failed=${reminders.failed}`,
+    );
+
+    return {
+      trialExpiration: trial,
+      renewalReminders: reminders,
+      timestamp: new Date().toISOString(),
+    };
+  };
+
+  fastify.post(
+    "/run-jobs",
+    { preHandler: [authenticateJobTrigger] },
+    runJobsHandler,
+  );
+  fastify.get(
+    "/run-jobs",
+    { preHandler: [authenticateJobTrigger] },
+    runJobsHandler,
   );
 }

@@ -8,5 +8,11 @@
 			"source": "/health",
 			"destination": "/api"
 		}
+	],
+	"crons": [
+		{
+			"path": "/api/automation/run-jobs",
+			"schedule": "0 9 * * *"
+		}
 	]
 }

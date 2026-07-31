@@ -7,6 +7,7 @@ import { env } from "./config/env.js";
 import { ensureSystemUser, runMigrations } from "./config/database.js";
 import { registerRoutes } from "./routes/index.js";
 import { startTrialExpirationJob } from "./services/trialExpirationJob.js";
+import { startRenewalReminderJob } from "./services/renewalReminderJob.js";
 
 // Extend FastifyRequest to include rawBody
 declare module "fastify" {
@@ -92,12 +93,16 @@ export async function buildApp() {
   // Ensure system user exists for automation uploads
   await ensureSystemUser();
 
-  // Background jobs (only in non-serverless runtime)
+  // Background jobs (only in non-serverless runtime).
+  // On Vercel there is no long-lived process: the same sweeps are triggered
+  // through POST /api/automation/run-jobs (see vercel.json crons).
   if (process.env.VERCEL !== "1") {
-    startTrialExpirationJob({
-      info: (msg) => fastify.log.info(msg),
-      error: (err) => fastify.log.error(err),
-    });
+    const jobLogger = {
+      info: (msg: string) => fastify.log.info(msg),
+      error: (err: unknown) => fastify.log.error(err),
+    };
+    startTrialExpirationJob(jobLogger);
+    startRenewalReminderJob(jobLogger);
   }
 
   // Health check

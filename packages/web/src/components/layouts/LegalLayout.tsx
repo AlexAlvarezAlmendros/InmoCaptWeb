@@ -62,6 +62,17 @@ export function LegalLayout({
             Términos y Condiciones
           </Link>
         </div>
+        <p className="mt-4 text-center text-xs text-slate-500">
+          Diseñado y Desarrollado por{" "}
+          <a
+            href="https://www.alexalvarez.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-primary"
+          >
+            alexalvarez.dev
+          </a>
+        </p>
       </footer>
     </div>
   );

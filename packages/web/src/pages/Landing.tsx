@@ -703,6 +703,17 @@ export function LandingPage() {
               © {new Date().getFullYear()} InmoCapt. Todos los derechos
               reservados.
             </p>
+            <p className="text-sm text-slate-400 dark:text-slate-500">
+              Diseñado y Desarrollado por{" "}
+              <a
+                href="https://www.alexalvarez.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary transition-colors"
+              >
+                alexalvarez.dev
+              </a>
+            </p>
           </div>
         </div>
       </footer>

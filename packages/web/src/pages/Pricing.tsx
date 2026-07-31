@@ -1208,6 +1208,17 @@ export function PricingPage() {
         <p style={{ fontSize: 12, color: "#CBD5E1" }}>
           © {new Date().getFullYear()} InmoCapt. Todos los derechos reservados.
         </p>
+        <p style={{ fontSize: 12, color: "#CBD5E1" }}>
+          Diseñado y Desarrollado por{" "}
+          <a
+            href="https://www.alexalvarez.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "inherit" }}
+          >
+            alexalvarez.dev
+          </a>
+        </p>
       </footer>
     </div>
   );

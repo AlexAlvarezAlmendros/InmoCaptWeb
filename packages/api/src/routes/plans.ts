@@ -16,6 +16,7 @@ import {
   upsertPaidPlanSubscription,
   applyPendingListChanges,
 } from "../services/planService.js";
+import { isFirstInvoiceFullyDiscounted } from "../services/promoService.js";
 import { resetPlanCredits, addPlanCredits } from "../services/creditService.js";
 import { db } from "../config/database.js";
 
@@ -162,6 +163,7 @@ export async function plansRoutes(fastify: FastifyInstance) {
           status: "active",
           currentPeriodStart: periodStart,
           currentPeriodEnd: periodEnd,
+          firstMonthFree: isFirstInvoiceFullyDiscounted(session),
         });
 
         const already = await db.execute({

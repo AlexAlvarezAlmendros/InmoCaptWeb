@@ -24,6 +24,8 @@ export interface UserPlanSubscription {
   current_period_start: string | null;
   current_period_end: string | null;
   pending_plan_id: string | null;
+  first_month_free: number;
+  renewal_reminder_sent_at: string | null;
   created_at: string;
 }
 
@@ -152,6 +154,8 @@ export async function createTrialForUser(userId: string): Promise<{
       current_period_start: now.toISOString(),
       current_period_end: end.toISOString(),
       pending_plan_id: null,
+      first_month_free: 0,
+      renewal_reminder_sent_at: null,
       created_at: now.toISOString(),
     },
   };
@@ -160,6 +164,10 @@ export async function createTrialForUser(userId: string): Promise<{
 /**
  * Upsert a paid plan subscription. Called from Stripe webhook after checkout.
  * Replaces any existing subscription row (including expired trial).
+ *
+ * `firstMonthFree` marks subscriptions whose first invoice was fully covered by
+ * a promo code: their next renewal is the first real charge, so the reminder job
+ * warns them beforehand. Any new upsert resets the flag and the reminder stamp.
  */
 export async function upsertPaidPlanSubscription(params: {
   userId: string;
@@ -169,15 +177,17 @@ export async function upsertPaidPlanSubscription(params: {
   status: string;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
+  firstMonthFree?: boolean;
 }): Promise<void> {
   const id = crypto.randomUUID();
   await db.execute({
     sql: `
       INSERT INTO user_plan_subscriptions (
         id, user_id, plan_id, stripe_subscription_id, stripe_customer_id,
-        status, current_period_start, current_period_end
+        status, current_period_start, current_period_end, first_month_free,
+        renewal_reminder_sent_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
       ON CONFLICT(user_id) DO UPDATE SET
         plan_id = excluded.plan_id,
         stripe_subscription_id = excluded.stripe_subscription_id,
@@ -185,7 +195,9 @@ export async function upsertPaidPlanSubscription(params: {
         status = excluded.status,
         current_period_start = excluded.current_period_start,
         current_period_end = excluded.current_period_end,
-        pending_plan_id = NULL
+        pending_plan_id = NULL,
+        first_month_free = excluded.first_month_free,
+        renewal_reminder_sent_at = NULL
     `,
     args: [
       id,
@@ -196,7 +208,83 @@ export async function upsertPaidPlanSubscription(params: {
       params.status,
       params.currentPeriodStart,
       params.currentPeriodEnd,
+      params.firstMonthFree ? 1 : 0,
     ],
+  });
+}
+
+/* ─── First month free (promo) ──────────────────────────────── */
+
+export interface PendingRenewalReminder {
+  user_id: string;
+  email: string;
+  plan_id: string;
+  plan_name: string;
+  price_cents: number;
+  currency: string;
+  current_period_end: string;
+}
+
+/**
+ * Subscriptions whose free first month ends within `daysAhead` days and that
+ * haven't been warned yet. Users who already cancelled ('canceling') are
+ * excluded: they won't be charged, so the notice would be misleading.
+ */
+export async function getSubscriptionsPendingRenewalReminder(
+  daysAhead: number,
+): Promise<PendingRenewalReminder[]> {
+  const result = await db.execute({
+    sql: `
+      SELECT
+        s.user_id,
+        u.email,
+        s.plan_id,
+        p.name AS plan_name,
+        p.price_cents,
+        p.currency,
+        s.current_period_end
+      FROM user_plan_subscriptions s
+      JOIN users u ON u.id = s.user_id
+      JOIN plans p ON p.id = s.plan_id
+      WHERE s.first_month_free = 1
+        AND s.renewal_reminder_sent_at IS NULL
+        AND s.status = 'active'
+        AND s.stripe_subscription_id IS NOT NULL
+        AND s.current_period_end IS NOT NULL
+        AND s.current_period_end > datetime('now')
+        AND s.current_period_end <= datetime('now', ?)
+        AND u.email IS NOT NULL
+    `,
+    args: [`+${daysAhead} days`],
+  });
+  return result.rows as unknown as PendingRenewalReminder[];
+}
+
+export async function markRenewalReminderSent(userId: string): Promise<void> {
+  await db.execute({
+    sql: `
+      UPDATE user_plan_subscriptions
+      SET renewal_reminder_sent_at = datetime('now')
+      WHERE user_id = ?
+    `,
+    args: [userId],
+  });
+}
+
+/**
+ * Clear the promo flag once the first real charge has gone through, so the
+ * reminder can never fire again for later renewals.
+ */
+export async function clearFirstMonthFree(
+  stripeSubscriptionId: string,
+): Promise<void> {
+  await db.execute({
+    sql: `
+      UPDATE user_plan_subscriptions
+      SET first_month_free = 0
+      WHERE stripe_subscription_id = ?
+    `,
+    args: [stripeSubscriptionId],
   });
 }
 

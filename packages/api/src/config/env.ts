@@ -38,6 +38,9 @@ const envSchema = z.object({
 
   // Automation
   API_AUTOMATION_KEY: z.string().optional(),
+  // Secret used by the scheduled-jobs trigger (Vercel sets it as a bearer token
+  // on cron requests). Falls back to API_AUTOMATION_KEY when unset.
+  CRON_SECRET: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.NODE_ENV === "production" && !data.API_AUTOMATION_KEY) {
     ctx.addIssue({

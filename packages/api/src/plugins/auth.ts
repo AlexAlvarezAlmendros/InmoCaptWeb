@@ -182,3 +182,47 @@ export async function authenticateApiKey(
   };
 }
 
+/**
+ * Auth for the scheduled-jobs trigger. Accepts the automation API key
+ * (X-API-Key) or a bearer token matching CRON_SECRET / API_AUTOMATION_KEY,
+ * which is the form Vercel crons use.
+ */
+export async function authenticateJobTrigger(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const accepted = [env.CRON_SECRET, env.API_AUTOMATION_KEY].filter(
+    (k): k is string => Boolean(k),
+  );
+
+  if (accepted.length === 0) {
+    request.log.error("Neither CRON_SECRET nor API_AUTOMATION_KEY configured");
+    reply.code(500).send({ error: "Jobs endpoint not configured" });
+    return;
+  }
+
+  const bearer = (request.headers.authorization || "").startsWith("Bearer ")
+    ? (request.headers.authorization as string).slice(7)
+    : undefined;
+  const provided = (request.headers["x-api-key"] as string | undefined) || bearer;
+
+  if (!provided) {
+    reply.code(401).send({ error: "Missing credentials" });
+    return;
+  }
+
+  // Compare fixed-length hashes so neither the value nor its length leaks.
+  const providedHash = createHash("sha256").update(provided).digest();
+  const matches = accepted.some((key) =>
+    cryptoTimingSafeEqual(
+      providedHash,
+      createHash("sha256").update(key).digest(),
+    ),
+  );
+
+  if (!matches) {
+    reply.code(401).send({ error: "Invalid credentials" });
+    return;
+  }
+}
+

@@ -30,7 +30,9 @@ import {
   upsertPaidPlanSubscription,
   setPlanPeriodEnd,
   applyPendingListChanges,
+  clearFirstMonthFree,
 } from "../services/planService.js";
+import { isFirstInvoiceFullyDiscounted } from "../services/promoService.js";
 import {
   grantTopupCredits,
   resetPlanCredits,
@@ -474,6 +476,8 @@ export async function billingRoutes(fastify: FastifyInstance) {
               ? new Date(subscription.current_period_end * 1000).toISOString()
               : null;
 
+            const firstMonthFree = isFirstInvoiceFullyDiscounted(session);
+
             await upsertPaidPlanSubscription({
               userId,
               planId,
@@ -482,7 +486,14 @@ export async function billingRoutes(fastify: FastifyInstance) {
               status: "active",
               currentPeriodStart: periodStart,
               currentPeriodEnd: periodEnd,
+              firstMonthFree,
             });
+
+            if (firstMonthFree) {
+              fastify.log.info(
+                `First month free applied: user=${userId}, plan=${planId}, firstCharge=${periodEnd}`,
+              );
+            }
 
             if (!(await stripeEventAlreadyProcessed(session.id))) {
               await resetPlanCredits({
@@ -911,6 +922,9 @@ export async function billingRoutes(fastify: FastifyInstance) {
                 note: "plan_renewal",
               });
             }
+            // The promo month is over once a renewal has been charged, so the
+            // first-charge reminder must never fire again for this subscription.
+            await clearFirstMonthFree(subscriptionId);
           }
 
           await applyPendingListChanges(userId);

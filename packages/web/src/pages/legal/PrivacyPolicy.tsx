@@ -108,6 +108,11 @@ export function PrivacyPolicyPage() {
           <strong>Proveedor de email:</strong> envío de notificaciones
           transaccionales.
         </li>
+        <li>
+          <strong>Umami (autoalojado):</strong> analítica de uso de la
+          Plataforma, sin cookies y en servidores propios. Ver la{" "}
+          <a href="/legal/cookies">Política de Cookies</a>.
+        </li>
       </ul>
       <p>
         No vendemos, alquilamos ni compartimos tus datos personales con terceros

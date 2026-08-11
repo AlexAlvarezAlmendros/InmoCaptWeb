@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Badge, getStateVariant } from "@/components/ui";
 import { formatPrice } from "@/lib/utils";
+import { track, trackOnce } from "@/lib/analytics";
 import { PropertyState } from "@/types";
 
 // ─── Demo Data ────────────────────────────────────────────────────
@@ -116,19 +117,42 @@ export function InteractiveDemo() {
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [stateFilter, setStateFilter] = useState<PropertyState | "all">("all");
 
+  // La demo es el principal indicador de interés en la landing: se registra la
+  // primera interacción y después cada tipo de acción (sin repetir por tecla).
+  const markDemoStart = () => trackOnce("demo_start", "demo_start");
+
   const handleListClick = (list: (typeof demoLists)[0]) => {
+    markDemoStart();
+    track("demo_list_open", { list: list.id });
     setSelectedList(list);
     setStateFilter("all");
     setView("list");
   };
 
+  const handleBack = (location: string) => {
+    markDemoStart();
+    track("demo_back", { location });
+    setView("dashboard");
+  };
+
+  const handleFilterChange = (filter: PropertyState | "all") => {
+    markDemoStart();
+    track("demo_filter", { filter, list: selectedList.id });
+    setStateFilter(filter);
+  };
+
   const handleStateChange = (propertyId: string, newState: PropertyState) => {
+    markDemoStart();
+    track("demo_state_change", { state: newState, list: selectedList.id });
     setProperties((prev) =>
       prev.map((p) => (p.id === propertyId ? { ...p, state: newState } : p)),
     );
   };
 
   const handleCommentChange = (propertyId: string, comment: string) => {
+    markDemoStart();
+    // onChange dispara por pulsación: se registra una sola vez por visita.
+    trackOnce("demo_comment", "demo_comment_save", { list: selectedList.id });
     setProperties((prev) =>
       prev.map((p) => (p.id === propertyId ? { ...p, comment } : p)),
     );
@@ -210,7 +234,7 @@ export function InteractiveDemo() {
             {/* Desktop nav */}
             <nav className="hidden items-center gap-0.5 sm:flex">
               <button
-                onClick={() => setView("dashboard")}
+                onClick={() => handleBack("nav")}
                 className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
                   view === "dashboard"
                     ? "bg-primary text-white"
@@ -265,8 +289,8 @@ export function InteractiveDemo() {
             totalCount={properties.length}
             stateCounts={stateCounts}
             stateFilter={stateFilter}
-            onFilterChange={setStateFilter}
-            onBack={() => setView("dashboard")}
+            onFilterChange={handleFilterChange}
+            onBack={() => handleBack("detail")}
             onStateChange={handleStateChange}
             onCommentChange={handleCommentChange}
             editingComment={editingComment}

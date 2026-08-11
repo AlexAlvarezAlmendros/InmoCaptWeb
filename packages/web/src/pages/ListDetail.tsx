@@ -18,6 +18,7 @@ import {
   useUpdatePropertyState,
   useUpdatePropertyComment,
 } from "@/hooks/useListProperties";
+import { track } from "@/lib/analytics";
 
 const PROPERTY_STATES: { value: PropertyState; label: string }[] = [
   { value: "new", label: "Nuevo" },
@@ -574,10 +575,37 @@ export function ListDetailPage() {
     appliedMaxPrice !== undefined;
 
   const clearSearchFilters = useCallback(() => {
+    track("list_search", { list: listId, action: "clear" });
     setSearchInput("");
     setMinPriceInput("");
     setMaxPriceInput("");
-  }, []);
+  }, [listId]);
+
+  // Búsqueda ya aplicada (tras el debounce): se registra el uso, no el texto.
+  useEffect(() => {
+    if (
+      appliedSearch === "" &&
+      appliedMinPrice === undefined &&
+      appliedMaxPrice === undefined
+    ) {
+      return;
+    }
+    track("list_search", {
+      list: listId,
+      action: "apply",
+      has_text: appliedSearch !== "",
+      has_min_price: appliedMinPrice !== undefined,
+      has_max_price: appliedMaxPrice !== undefined,
+    });
+  }, [listId, appliedSearch, appliedMinPrice, appliedMaxPrice]);
+
+  const handleStateFilterChange = useCallback(
+    (filter: PropertyState | "all", location: string) => {
+      track("list_filter_change", { list: listId, filter, location });
+      setStateFilter(filter);
+    },
+    [listId],
+  );
 
   const { data: userPlan, isLoading: isLoadingPlan } = useUserPlan();
   const { data: listInfo, isLoading: isLoadingList } = useList(listId);
@@ -610,6 +638,7 @@ export function ListDetailPage() {
   const handleStateChange = useCallback(
     (propertyId: string, state: PropertyState) => {
       if (!listId) return;
+      track("property_state_change", { list: listId, state });
       updateStateMutation.mutate({ listId, propertyId, state });
     },
     [listId, updateStateMutation],
@@ -618,6 +647,10 @@ export function ListDetailPage() {
   const handleCommentChange = useCallback(
     (propertyId: string, comment: string) => {
       if (!listId) return;
+      track("property_comment_save", {
+        list: listId,
+        cleared: comment.trim().length === 0,
+      });
       updateCommentMutation.mutate({ listId, propertyId, comment });
     },
     [listId, updateCommentMutation],
@@ -626,15 +659,32 @@ export function ListDetailPage() {
   const handleReveal = useCallback(
     (propertyId: string) => {
       if (!listId) return;
+
+      track("property_reveal_click", {
+        list: listId,
+        credits: userPlan?.credits.total,
+      });
+
       if (userPlan && userPlan.credits.total <= 0) {
+        track("property_reveal_blocked", { list: listId, reason: "no_credits" });
+        track("list_no_credits_modal", { list: listId, source: "preflight" });
         setShowNoCreditsModal(true);
         return;
       }
       revealMutation.mutate(
         { listId, propertyId },
         {
+          onSuccess: () => {
+            track("property_reveal_success", { list: listId });
+          },
           onError: (err) => {
+            track("property_reveal_blocked", {
+              list: listId,
+              reason: err.status === 402 ? "no_credits" : "error",
+              status: err.status,
+            });
             if (err.status === 402) {
+              track("list_no_credits_modal", { list: listId, source: "api" });
               setShowNoCreditsModal(true);
             }
           },
@@ -696,7 +746,17 @@ export function ListDetailPage() {
               <p className="mb-4 text-slate-500">
                 Esta lista no está incluida en tu plan actual.
               </p>
-              <Button onClick={() => navigate("/app/plans")}>Ver planes</Button>
+              <Button
+                onClick={() => {
+                  track("dashboard_upgrade_click", {
+                    location: "list_no_access",
+                    list: listId,
+                  });
+                  navigate("/app/plans");
+                }}
+              >
+                Ver planes
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -736,7 +796,14 @@ export function ListDetailPage() {
           </p>
           {userPlan && (
             <button
-              onClick={() => navigate("/app/credits")}
+              onClick={() => {
+                track("list_no_credits_buy_click", {
+                  list: listId,
+                  source: "credits_badge",
+                  credits: userPlan.credits.total,
+                });
+                navigate("/app/credits");
+              }}
               className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-colors ${
                 userPlan.credits.total <= 0
                   ? "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300"
@@ -782,7 +849,7 @@ export function ListDetailPage() {
             {STATE_FILTERS.map((filter) => (
               <button
                 key={filter.value}
-                onClick={() => setStateFilter(filter.value)}
+                onClick={() => handleStateFilterChange(filter.value, "desktop")}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors sm:rounded-none sm:first:rounded-l-lg sm:last:rounded-r-lg ${
                   stateFilter === filter.value
                     ? "bg-primary text-white"
@@ -872,7 +939,7 @@ export function ListDetailPage() {
           return (
             <button
               key={state.value}
-              onClick={() => setStateFilter(state.value)}
+              onClick={() => handleStateFilterChange(state.value, "mobile")}
               className={`rounded-lg border p-3 text-center transition-colors ${
                 stateFilter === state.value
                   ? "border-primary bg-primary/5"
@@ -916,7 +983,7 @@ export function ListDetailPage() {
               ) : (
                 stateFilter !== "all" && (
                   <button
-                    onClick={() => setStateFilter("all")}
+                    onClick={() => handleStateFilterChange("all", "empty_state")}
                     className="mt-2 text-primary hover:underline"
                   >
                     Ver todos los inmuebles
@@ -992,7 +1059,14 @@ export function ListDetailPage() {
             <div className="mt-6 flex justify-center">
               <Button
                 variant="secondary"
-                onClick={() => fetchNextPage()}
+                onClick={() => {
+                  track("list_load_more", {
+                    list: listId,
+                    loaded: properties.length,
+                    total: totalProperties,
+                  });
+                  fetchNextPage();
+                }}
                 disabled={isFetchingNextPage}
               >
                 {isFetchingNextPage ? (
@@ -1055,7 +1129,10 @@ export function ListDetailPage() {
                 Cerrar
               </Button>
               <Button
-                onClick={() => navigate("/app/credits?reason=empty")}
+                onClick={() => {
+                  track("list_no_credits_buy_click", { list: listId });
+                  navigate("/app/credits?reason=empty");
+                }}
                 className="flex-1"
               >
                 Comprar créditos

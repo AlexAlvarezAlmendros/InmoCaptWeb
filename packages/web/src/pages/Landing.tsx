@@ -3,9 +3,13 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui";
 import { InteractiveDemo } from "@/components/landing/InteractiveDemo";
 import { useSEO } from "@/hooks/useSEO";
+import { useScrollDepth } from "@/hooks/useScrollDepth";
+import { track } from "@/lib/analytics";
 
 export function LandingPage() {
   const { loginWithRedirect, isAuthenticated } = useAuth0();
+
+  useScrollDepth("landing");
 
   useSEO({
     title: "InmoCapt — Captación de particulares para agentes inmobiliarios",
@@ -14,10 +18,14 @@ export function LandingPage() {
     canonical: "https://inmocapt.com/",
   });
 
-  const handleGetStarted = () => {
+  const handleGetStarted = (location: string) => () => {
+    const action = isAuthenticated ? "dashboard" : "signup";
+    track("landing_cta_click", { location, action });
+
     if (isAuthenticated) {
       window.location.href = "/app/dashboard";
     } else {
+      track("auth_login_start", { location, page: "landing" });
       loginWithRedirect({ appState: { returnTo: "/app/dashboard" } });
     }
   };
@@ -40,11 +48,12 @@ export function LandingPage() {
           <div className="flex items-center gap-4">
             <Link
               to="/pricing"
+              onClick={() => track("landing_pricing_click", { location: "header" })}
               className="hidden text-sm font-medium text-slate-600 transition-colors hover:text-primary dark:text-slate-300 sm:inline"
             >
               Precios
             </Link>
-            <Button onClick={handleGetStarted}>
+            <Button onClick={handleGetStarted("header")}>
               {isAuthenticated ? "Ir al panel" : "Empezar ahora"}
             </Button>
           </div>
@@ -72,7 +81,7 @@ export function LandingPage() {
               notificaciones por zona. La herramienta profesional que necesitas.
             </p>
             <div className="mt-10 flex items-center justify-center">
-              <Button size="lg" variant="accent" onClick={handleGetStarted}>
+              <Button size="lg" variant="accent" onClick={handleGetStarted("hero")}>
                 Empezar ahora
               </Button>
             </div>
@@ -569,7 +578,12 @@ export function LandingPage() {
               para revelar contactos. Los top-ups comprados nunca caducan.
             </p>
             <div className="mt-8">
-              <Link to="/pricing">
+              <Link
+                to="/pricing"
+                onClick={() =>
+                  track("landing_pricing_click", { location: "pricing_section" })
+                }
+              >
                 <Button size="lg">Ver planes y precios</Button>
               </Link>
             </div>
@@ -659,7 +673,7 @@ export function LandingPage() {
               size="lg"
               variant="accent"
               className="mt-8"
-              onClick={handleGetStarted}
+              onClick={handleGetStarted("final_cta")}
             >
               Crear cuenta gratis
             </Button>
@@ -674,30 +688,23 @@ export function LandingPage() {
               aria-label="Enlaces legales"
               className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs sm:text-sm sm:gap-x-6 text-slate-500 dark:text-slate-400"
             >
-              <Link
-                to="/legal/aviso-legal"
-                className="hover:text-primary transition-colors"
-              >
-                Aviso Legal
-              </Link>
-              <Link
-                to="/legal/privacidad"
-                className="hover:text-primary transition-colors"
-              >
-                Política de Privacidad
-              </Link>
-              <Link
-                to="/legal/cookies"
-                className="hover:text-primary transition-colors"
-              >
-                Política de Cookies
-              </Link>
-              <Link
-                to="/legal/terminos"
-                className="hover:text-primary transition-colors"
-              >
-                Términos y Condiciones
-              </Link>
+              {[
+                { to: "/legal/aviso-legal", doc: "aviso-legal", label: "Aviso Legal" },
+                { to: "/legal/privacidad", doc: "privacidad", label: "Política de Privacidad" },
+                { to: "/legal/cookies", doc: "cookies", label: "Política de Cookies" },
+                { to: "/legal/terminos", doc: "terminos", label: "Términos y Condiciones" },
+              ].map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  onClick={() =>
+                    track("landing_legal_click", { doc: link.doc })
+                  }
+                  className="hover:text-primary transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
             </nav>
             <p className="text-sm text-slate-400 dark:text-slate-500">
               © {new Date().getFullYear()} InmoCapt. Todos los derechos

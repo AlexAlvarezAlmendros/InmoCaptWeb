@@ -2,6 +2,7 @@ import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import { Button } from "@/components/ui";
 import { useSEO } from "@/hooks/useSEO";
+import { track } from "@/lib/analytics";
 import { useState } from "react";
 
 export function AdminLayout() {
@@ -12,6 +13,7 @@ export function AdminLayout() {
   useSEO({ title: "Panel Admin | InmoCapt", noindex: true });
 
   const handleLogout = () => {
+    track("auth_logout", { location: "admin_header" });
     logout({ logoutParams: { returnTo: window.location.origin } });
   };
 

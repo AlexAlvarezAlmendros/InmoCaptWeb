@@ -15,6 +15,7 @@ import { useUserPlan, useActivateList, useRequestListChange, useVerifyPlanSessio
 import { useMyLists, useListCatalog } from "@/hooks/useMyLists";
 import type { CatalogList, MyListCard } from "@/hooks/useMyLists";
 import { useCreateListRequest, useListRequests } from "@/hooks/useListRequests";
+import { track } from "@/lib/analytics";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -34,6 +35,7 @@ export function DashboardPage() {
       !verifySession.isPending
     ) {
       verifiedRef.current = true;
+      track("dashboard_checkout_success");
       verifySession.mutate(sessionId, {
         onSettled: () => {
           const next = new URLSearchParams(searchParams);
@@ -98,17 +100,33 @@ export function DashboardPage() {
 
   const handleActivate = async (list: CatalogList) => {
     setActionError(null);
+    track("dashboard_list_activate", {
+      list: list.id,
+      plan: userPlan?.planId,
+      slots_used: usedSlots,
+    });
     try {
       await activateList.mutateAsync(list.id);
     } catch (err: unknown) {
       const e = err as { message?: string; data?: { error?: string } };
-      setActionError(e.data?.error || e.message || "Error al activar la lista");
+      const message =
+        e.data?.error || e.message || "Error al activar la lista";
+      track("dashboard_list_activate_error", {
+        list: list.id,
+        reason: message,
+      });
+      setActionError(message);
     }
   };
 
   const handleQueueSwap = async () => {
     if (!swapTarget || !swapReplaceId) return;
     setActionError(null);
+    track("dashboard_swap_confirm", {
+      list: swapTarget.id,
+      replaces: swapReplaceId,
+      plan: userPlan?.planId,
+    });
     try {
       await requestChange.mutateAsync({
         listId: swapTarget.id,
@@ -125,12 +143,14 @@ export function DashboardPage() {
 
   const openSwapModal = (list: CatalogList) => {
     setActionError(null);
+    track("dashboard_swap_open", { list: list.id, plan: userPlan?.planId });
     setSwapReplaceId(myLists?.[0]?.id ?? "");
     setSwapTarget(list);
   };
 
   const openRequestModal = () => {
     setActionError(null);
+    track("list_request_open", { source: "dashboard" });
     setRequestLocation("");
     setRequestNotes("");
     setIsRequestModalOpen(true);
@@ -140,6 +160,10 @@ export function DashboardPage() {
     const location = requestLocation.trim();
     if (!location) return;
     setActionError(null);
+    track("list_request_submit", {
+      source: "dashboard",
+      has_notes: requestNotes.trim().length > 0,
+    });
     try {
       await createListRequest.mutateAsync({
         location,
@@ -150,9 +174,10 @@ export function DashboardPage() {
       setRequestNotes("");
     } catch (err: unknown) {
       const e = err as { message?: string; data?: { error?: string } };
-      setActionError(
-        e.data?.error || e.message || "Error al enviar la solicitud",
-      );
+      const message =
+        e.data?.error || e.message || "Error al enviar la solicitud";
+      track("list_request_error", { source: "dashboard", reason: message });
+      setActionError(message);
     }
   };
 
@@ -200,7 +225,14 @@ export function DashboardPage() {
               <p className="mb-4 text-slate-500">
                 Contrata un plan para acceder a listados de particulares.
               </p>
-              <Button onClick={() => navigate("/app/plans")}>Ver planes</Button>
+              <Button
+                onClick={() => {
+                  track("dashboard_upgrade_click", { location: "no_plan" });
+                  navigate("/app/plans");
+                }}
+              >
+                Ver planes
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -266,7 +298,12 @@ export function DashboardPage() {
               : "próximo ciclo"}
             . Puedes revisarlos desde{" "}
             <button
-              onClick={() => navigate("/app/plans")}
+              onClick={() => {
+                track("dashboard_upgrade_click", {
+                  location: "pending_changes",
+                });
+                navigate("/app/plans");
+              }}
               className="underline hover:no-underline"
             >
               Planes
@@ -296,7 +333,13 @@ export function DashboardPage() {
               <MyListCardView
                 key={list.id}
                 list={list}
-                onClick={() => navigate(`/app/lists/${list.id}`)}
+                onClick={() => {
+                  track("dashboard_list_open", {
+                    list: list.id,
+                    new_properties: list.newPropertiesCount,
+                  });
+                  navigate(`/app/lists/${list.id}`);
+                }}
               />
             ))}
           </div>
@@ -323,7 +366,10 @@ export function DashboardPage() {
             Has usado las {maxLists} listas de tu plan. Puedes programar un
             cambio que se aplicará al renovar, o{" "}
             <button
-              onClick={() => navigate("/app/plans")}
+              onClick={() => {
+                track("dashboard_upgrade_click", { location: "no_slots" });
+                navigate("/app/plans");
+              }}
               className="text-primary underline hover:no-underline"
             >
               subir de plan
@@ -424,6 +470,11 @@ export function DashboardPage() {
                                 onClick={() => {
                                   if (!req.createdListId) return;
                                   if (slotsAvailable) {
+                                    track("dashboard_list_activate", {
+                                      list: req.createdListId,
+                                      plan: userPlan?.planId,
+                                      source: "request",
+                                    });
                                     activateList.mutate(req.createdListId);
                                   } else {
                                     openSwapModal({

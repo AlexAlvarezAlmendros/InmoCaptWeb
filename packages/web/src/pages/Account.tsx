@@ -17,6 +17,7 @@ import {
 import { useCreatePortalSession } from "@/hooks/useBilling";
 import { useUserPlan } from "@/hooks/usePlan";
 import { formatDate } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 
 export function AccountPage() {
   const { user, logout } = useAuth0();
@@ -55,6 +56,9 @@ export function AccountPage() {
   }, [emailNotifications, profile]);
 
   const handleSavePreferences = async () => {
+    track("account_preferences_save", {
+      email_notifications: emailNotifications,
+    });
     try {
       await updatePreferences.mutateAsync({
         emailNotificationsOn: emailNotifications,
@@ -71,6 +75,7 @@ export function AccountPage() {
       return;
     }
 
+    track("account_password_reset_request", { provider: loginProvider });
     setPasswordResetLoading(true);
     try {
       // Call Auth0's change password endpoint
@@ -101,6 +106,10 @@ export function AccountPage() {
   };
 
   const handleManageBilling = async () => {
+    track("billing_portal_open", {
+      location: "account",
+      plan: userPlan?.planId,
+    });
     try {
       await createPortalSession.mutateAsync();
     } catch (error) {
@@ -109,6 +118,7 @@ export function AccountPage() {
   };
 
   const handleLogout = () => {
+    track("auth_logout", { location: "account" });
     logout({ logoutParams: { returnTo: window.location.origin } });
   };
 
@@ -467,7 +477,13 @@ export function AccountPage() {
             Eliminar tu cuenta cancelará todas tus suscripciones y eliminará
             permanentemente todos tus datos. Esta acción no se puede deshacer.
           </p>
-          <Button variant="danger" onClick={() => setShowDeleteModal(true)}>
+          <Button
+            variant="danger"
+            onClick={() => {
+              track("account_delete_open", { plan: userPlan?.planId });
+              setShowDeleteModal(true);
+            }}
+          >
             Eliminar cuenta
           </Button>
         </CardContent>
@@ -509,6 +525,7 @@ export function AccountPage() {
               variant="danger"
               disabled={deleteAccount.isPending}
               onClick={async () => {
+                track("account_delete_confirm", { plan: userPlan?.planId });
                 setDeleteError(null);
                 try {
                   await deleteAccount.mutateAsync();

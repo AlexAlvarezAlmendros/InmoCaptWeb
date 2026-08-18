@@ -76,11 +76,29 @@ export function CookiesPolicyPage() {
         </tbody>
       </table>
 
-      <h3>2.3. Cookies analíticas</h3>
+      <h3>2.3. Analítica sin cookies</h3>
       <p>
-        Actualmente <strong>no utilizamos</strong> cookies analíticas ni de
-        terceros con fines estadísticos. Si en el futuro se incorporaran,
-        actualizaremos esta política y solicitaremos tu consentimiento previo.
+        Para medir el uso de la Plataforma utilizamos <strong>Umami</strong>, una
+        herramienta de analítica alojada en nuestros propios servidores que{" "}
+        <strong>no instala cookies</strong> ni crea identificadores publicitarios.
+        Registra datos agregados de navegación (páginas vistas, procedencia,
+        tipo de dispositivo, país e interacciones con la interfaz) y, dentro del
+        área privada, un identificador interno de cuenta que nos permite
+        distinguir el uso por tipo de plan.
+      </p>
+      <p>
+        Umami incluye además una función de <strong>grabación de sesión y mapas
+        de calor</strong> que reconstruye de forma anónima los recorridos por la
+        interfaz (movimientos de ratón, clics y desplazamiento) con el único fin
+        de detectar errores y mejorar la usabilidad. No se registran contraseñas
+        ni datos de pago.
+      </p>
+      <p>
+        Al no emplear cookies ni almacenamiento equivalente con fines de
+        seguimiento, esta analítica no requiere consentimiento previo conforme al
+        art. 22.2 LSSI. Puedes oponerte a ella activando la señal{" "}
+        <em>Do Not Track</em> de tu navegador o escribiéndonos a{" "}
+        <a href={`mailto:${LEGAL.privacyEmail}`}>{LEGAL.privacyEmail}</a>.
       </p>
 
       <h3>2.4. Cookies publicitarias</h3>

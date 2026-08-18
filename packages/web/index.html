@@ -15,6 +15,91 @@
       gtag("config", "AW-17965718683");
     </script>
 
+    <!-- Umami — analítica self-hosted (pageviews, eventos, replays y heatmaps) -->
+    <script>
+      (function () {
+        var HOST = "https://analiticas.alexalvarez.dev";
+        var WEBSITE_ID = "79358895-19fb-481f-ba7d-261e2da757e6";
+        var ALLOWED_HOSTS = ["inmocapt.com", "www.inmocapt.com"];
+
+        // Parámetros que nunca deben salir del navegador hacia la analítica.
+        var SENSITIVE_PARAMS = [
+          "session_id",
+          "code",
+          "state",
+          "token",
+          "id_token",
+          "access_token",
+          "refresh_token",
+          "email",
+          "invitation",
+        ];
+
+        // script.js la invoca (data-before-send) antes de cada envío.
+        window.umamiBeforeSend = function (type, payload) {
+          try {
+            if (payload && typeof payload.url === "string") {
+              var isAbsolute = /^https?:\/\//i.test(payload.url);
+              var url = new URL(payload.url, window.location.origin);
+              var redacted = false;
+              for (var i = 0; i < SENSITIVE_PARAMS.length; i++) {
+                if (url.searchParams.has(SENSITIVE_PARAMS[i])) {
+                  url.searchParams.set(SENSITIVE_PARAMS[i], "redacted");
+                  redacted = true;
+                }
+              }
+              if (redacted) {
+                payload.url = isAbsolute
+                  ? url.toString()
+                  : url.pathname + url.search + url.hash;
+              }
+            }
+          } catch (e) {
+            /* nunca romper el envío por no poder sanear la URL */
+          }
+          return payload;
+        };
+
+        // Respetamos "Do Not Track" antes de cargar nada: script.js lo soporta
+        // por configuración, pero recorder.js no, así que se comprueba aquí
+        // para que la señal cubra también las grabaciones de sesión.
+        var dnt =
+          window.doNotTrack ||
+          window.navigator.doNotTrack ||
+          window.navigator.msDoNotTrack;
+        if (dnt === "1" || dnt === 1 || dnt === "yes") return;
+
+        // En local/preview no se envía nada salvo que se fuerce a mano con
+        // localStorage.setItem("umami.force", "1") para poder depurar.
+        var forced = false;
+        try {
+          forced = window.localStorage.getItem("umami.force") === "1";
+        } catch (e) {}
+        if (!forced && ALLOWED_HOSTS.indexOf(window.location.hostname) === -1) {
+          return;
+        }
+
+        function inject(src, attrs) {
+          var el = document.createElement("script");
+          el.async = true;
+          el.src = src;
+          el.setAttribute("data-website-id", WEBSITE_ID);
+          for (var key in attrs) {
+            if (Object.prototype.hasOwnProperty.call(attrs, key)) {
+              el.setAttribute(key, attrs[key]);
+            }
+          }
+          document.head.appendChild(el);
+        }
+
+        var trackerAttrs = { "data-before-send": "umamiBeforeSend" };
+        if (!forced) trackerAttrs["data-domains"] = ALLOWED_HOSTS.join(",");
+
+        inject(HOST + "/script.js", trackerAttrs);
+        inject(HOST + "/recorder.js", {});
+      })();
+    </script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -81,6 +166,7 @@
     <meta name="theme-color" content="#1E3A5F" />
 
     <!-- Preconnect & Fonts -->
+    <link rel="preconnect" href="https://analiticas.alexalvarez.dev" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

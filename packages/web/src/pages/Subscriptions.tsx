@@ -20,6 +20,7 @@ import {
   useCancelSubscription,
 } from "@/hooks/useBilling";
 import { useCreateListRequest, useListRequests } from "@/hooks/useListRequests";
+import { track, trackOnce } from "@/lib/analytics";
 
 export function SubscriptionsPage() {
   const navigate = useNavigate();
@@ -79,6 +80,7 @@ export function SubscriptionsPage() {
   );
 
   const handleSubscribe = async (listId: string) => {
+    track("subscription_checkout_start", { list: listId });
     setSubscribingListId(listId);
     try {
       await createCheckoutSession.mutateAsync({ listId });
@@ -90,6 +92,7 @@ export function SubscriptionsPage() {
   };
 
   const handleManageSubscriptions = async () => {
+    track("billing_portal_open", { location: "subscriptions" });
     try {
       await createPortalSession.mutateAsync();
     } catch (error) {
@@ -98,6 +101,7 @@ export function SubscriptionsPage() {
   };
 
   const handleOpenCancelModal = (subscriptionId: string, listName: string) => {
+    track("subscription_cancel_open", { subscription: subscriptionId });
     setSubscriptionToCancel({ id: subscriptionId, listName });
     setShowCancelModal(true);
   };
@@ -110,6 +114,7 @@ export function SubscriptionsPage() {
   const handleConfirmCancel = async () => {
     if (!subscriptionToCancel) return;
 
+    track("subscription_cancel_confirm", { subscription: subscriptionToCancel.id });
     setCancellingSubscriptionId(subscriptionToCancel.id);
     try {
       await cancelSubscription.mutateAsync({
@@ -124,6 +129,7 @@ export function SubscriptionsPage() {
   };
 
   const handleOpenRequestModal = () => {
+    track("list_request_open", { source: "subscriptions" });
     setRequestLocation("");
     setRequestNotes("");
     setRequestSuccess(false);
@@ -141,6 +147,10 @@ export function SubscriptionsPage() {
     e.preventDefault();
     if (!requestLocation.trim()) return;
 
+    track("list_request_submit", {
+      source: "subscriptions",
+      has_notes: requestNotes.trim().length > 0,
+    });
     try {
       await createListRequest.mutateAsync({
         location: requestLocation.trim(),
@@ -148,6 +158,7 @@ export function SubscriptionsPage() {
       });
       setRequestSuccess(true);
     } catch (error) {
+      track("list_request_error", { source: "subscriptions" });
       console.error("Failed to create list request:", error);
     }
   };
@@ -178,6 +189,8 @@ export function SubscriptionsPage() {
   );
 
   const handleSearchChange = (value: string) => {
+    // Solo interesa saber que se usa el buscador, no lo que se teclea.
+    if (value.trim()) trackOnce("subscriptions_search", "subscription_search");
     setSearchQuery(value);
     setCurrentPage(1);
   };

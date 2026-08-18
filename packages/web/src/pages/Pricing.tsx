@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import { Link } from "react-router-dom";
 import { useSEO } from "@/hooks/useSEO";
+import { useScrollDepth } from "@/hooks/useScrollDepth";
+import { track } from "@/lib/analytics";
 
 const C = {
   primary: "#1E3A5F",
@@ -576,7 +578,7 @@ function ComparisonTable() {
   );
 }
 
-function TopupCard({ pack }: { pack: Topup }) {
+function TopupCard({ pack, onSelect }: { pack: Topup; onSelect: () => void }) {
   const [hovered, setHovered] = useState(false);
   const border = hovered ? "rgba(30,58,95,0.4)" : C.border;
 
@@ -676,6 +678,7 @@ function TopupCard({ pack }: { pack: Topup }) {
         Los créditos no caducan
       </div>
       <button
+        onClick={onSelect}
         style={{
           width: "100%",
           height: 38,
@@ -706,6 +709,8 @@ function TopupCard({ pack }: { pack: Topup }) {
 export function PricingPage() {
   const { loginWithRedirect, isAuthenticated } = useAuth0();
 
+  useScrollDepth("pricing");
+
   useSEO({
     title: "Precios — InmoCapt",
     description:
@@ -713,12 +718,38 @@ export function PricingPage() {
     canonical: "https://inmocapt.com/pricing",
   });
 
-  const handleGetStarted = () => {
+  const startSignup = (location: string) => {
     if (isAuthenticated) {
       window.location.href = "/app/dashboard";
     } else {
+      track("auth_login_start", { location, page: "pricing" });
       loginWithRedirect({ appState: { returnTo: "/app/dashboard" } });
     }
+  };
+
+  const handleGetStarted = (location: string) => () => {
+    track("pricing_cta_click", {
+      location,
+      action: isAuthenticated ? "dashboard" : "signup",
+    });
+    startSignup(location);
+  };
+
+  const handlePlanSelect = (planId: PlanId) => {
+    track("pricing_plan_select", {
+      plan: planId,
+      action: isAuthenticated ? "dashboard" : "signup",
+    });
+    startSignup(`plan_card_${planId}`);
+  };
+
+  const handlePackClick = (pack: Topup) => {
+    track("pricing_pack_click", {
+      pack: pack.id,
+      credits: pack.credits,
+      price: pack.price,
+    });
+    startSignup(`pack_${pack.id}`);
   };
 
   const textMain = C.fg;
@@ -766,7 +797,7 @@ export function PricingPage() {
           </Link>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <button
-              onClick={handleGetStarted}
+              onClick={handleGetStarted("header_login")}
               style={{
                 height: 36,
                 padding: "0 16px",
@@ -782,7 +813,7 @@ export function PricingPage() {
               Iniciar sesión
             </button>
             <button
-              onClick={handleGetStarted}
+              onClick={handleGetStarted("header_signup")}
               style={{
                 height: 36,
                 padding: "0 16px",
@@ -872,7 +903,7 @@ export function PricingPage() {
             }}
           >
             {PLANS.map((p) => (
-              <PlanCard key={p.id} plan={p} onSelect={handleGetStarted} />
+              <PlanCard key={p.id} plan={p} onSelect={handlePlanSelect} />
             ))}
           </div>
 
@@ -1060,7 +1091,11 @@ export function PricingPage() {
             </div>
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
               {TOPUPS.map((pack) => (
-                <TopupCard key={pack.id} pack={pack} />
+                <TopupCard
+                  key={pack.id}
+                  pack={pack}
+                  onSelect={() => handlePackClick(pack)}
+                />
               ))}
             </div>
           </div>
@@ -1123,7 +1158,7 @@ export function PricingPage() {
               }}
             >
               <button
-                onClick={handleGetStarted}
+                onClick={handleGetStarted("trial_banner")}
                 style={{
                   height: 48,
                   padding: "0 28px",
@@ -1143,6 +1178,10 @@ export function PricingPage() {
                 href="#planes"
                 onClick={(e) => {
                   e.preventDefault();
+                  track("pricing_cta_click", {
+                    location: "trial_banner_see_plans",
+                    action: "scroll_to_plans",
+                  });
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 style={{
@@ -1195,6 +1234,11 @@ export function PricingPage() {
             <Link
               key={l.to}
               to={l.to}
+              onClick={() =>
+                track("pricing_legal_click", {
+                  doc: l.to.replace("/legal/", ""),
+                })
+              }
               style={{
                 fontSize: 12,
                 color: C.fgSubtle,

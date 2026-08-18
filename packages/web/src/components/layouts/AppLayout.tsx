@@ -4,6 +4,8 @@ import { Button } from "@/components/ui";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { useUserPlan } from "@/hooks/usePlan";
 import { useSEO } from "@/hooks/useSEO";
+import { useAnalyticsPlan } from "@/hooks/useAnalyticsPlan";
+import { track } from "@/lib/analytics";
 import { useState } from "react";
 
 function PlanBadge({ className = "" }: { className?: string }) {
@@ -46,8 +48,10 @@ export function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useSEO({ title: "Panel de Agente | InmoCapt", noindex: true });
+  useAnalyticsPlan();
 
-  const handleLogout = () => {
+  const handleLogout = (location: string) => () => {
+    track("auth_logout", { location });
     logout({ logoutParams: { returnTo: window.location.origin } });
   };
 
@@ -110,7 +114,7 @@ export function AppLayout() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleLogout}
+              onClick={handleLogout("app_header")}
               className="hidden md:inline-flex"
             >
               Cerrar sesión
@@ -204,7 +208,7 @@ export function AppLayout() {
                   {user?.email}
                 </p>
                 <button
-                  onClick={handleLogout}
+                  onClick={handleLogout("app_mobile_menu")}
                   className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                 >
                   Cerrar sesión

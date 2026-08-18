@@ -9,6 +9,7 @@ import {
   usePackCheckout,
   useVerifyPackSession,
 } from "@/hooks/useCredits";
+import { track } from "@/lib/analytics";
 import type { CreditPack, CreditTransaction } from "@/types";
 
 const TX_LABELS: Record<CreditTransaction["type"], string> = {
@@ -84,6 +85,7 @@ export function CreditsPage() {
       !verifySession.isPending
     ) {
       verifiedRef.current = true;
+      track("credits_purchase_success");
       verifySession.mutate(sessionId, {
         onSettled: () => {
           const next = new URLSearchParams(searchParams);
@@ -94,7 +96,19 @@ export function CreditsPage() {
     }
   }, [checkoutStatus, sessionId, verifySession, searchParams, setSearchParams]);
 
+  // Llegada desde el modal de "sin créditos" en el detalle de lista.
+  useEffect(() => {
+    if (reason === "empty") track("credits_empty_landing");
+  }, [reason]);
+
   const handleBuy = (packId: string) => {
+    const pack = packs?.find((p) => p.id === packId);
+    track("credits_pack_checkout_start", {
+      pack: packId,
+      credits: pack?.credits,
+      price_cents: pack?.priceCents,
+      balance: balance?.total,
+    });
     setSelectedPackId(packId);
     checkoutMutation.mutate(packId, {
       onSuccess: (url) => {

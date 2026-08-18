@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Analytics } from '@vercel/analytics/react';
 import { AppRouter } from './router';
 import { AuthProvider } from './providers/AuthProvider';
+import { AnalyticsProvider } from './providers/AnalyticsProvider';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,7 +19,9 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <AppRouter />
+          <AnalyticsProvider>
+            <AppRouter />
+          </AnalyticsProvider>
         </AuthProvider>
       </BrowserRouter>
       <Analytics />

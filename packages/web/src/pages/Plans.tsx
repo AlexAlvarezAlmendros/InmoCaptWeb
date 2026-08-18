@@ -12,6 +12,7 @@ import {
   useCancelPendingListChange,
   useVerifyPlanSession,
 } from "@/hooks/usePlan";
+import { track } from "@/lib/analytics";
 import type { ApiError } from "@/services/apiClient";
 import type { Plan } from "@/types";
 
@@ -177,6 +178,7 @@ export function PlansPage() {
       !verifySession.isPending
     ) {
       verifiedRef.current = true;
+      track("plan_checkout_success");
       verifySession.mutate(sessionId, {
         onSettled: () => {
           const next = new URLSearchParams(searchParams);
@@ -197,6 +199,10 @@ export function PlansPage() {
     setCheckoutError(null);
     if (!hasPaidActivePlan) {
       // Trial or no plan: use Stripe Checkout
+      track("plan_checkout_start", {
+        plan: planId,
+        from_plan: userPlan?.planId ?? "none",
+      });
       setSelectedPlanId(planId);
       checkoutMutation.mutate(planId, {
         onSuccess: (url) => {
@@ -206,6 +212,11 @@ export function PlansPage() {
           setSelectedPlanId(null);
           const apiErr = err as ApiError;
           const message = apiErr.message || "Error al iniciar el pago";
+          track("plan_checkout_error", {
+            plan: planId,
+            status: apiErr.status,
+            reason: message,
+          });
           // If API says the user already has an active plan, refresh userPlan
           // so the UI updates and the change-plan flow is used instead.
           if (apiErr.status === 400 && message.toLowerCase().includes("ya tienes")) {
@@ -228,11 +239,21 @@ export function PlansPage() {
     const targetIdx = plans!.indexOf(targetPlan);
     const type = targetIdx > currentIdx ? "upgrade" : "downgrade";
 
+    track("plan_change_open", {
+      plan: planId,
+      from_plan: currentPlan.id,
+      type,
+    });
     setChangePlanTarget({ plan: targetPlan, type });
   };
 
   const handleConfirmChangePlan = () => {
     if (!changePlanTarget) return;
+    track("plan_change_confirm", {
+      plan: changePlanTarget.plan.id,
+      from_plan: userPlan?.planId,
+      type: changePlanTarget.type,
+    });
     changePlanMutation.mutate(changePlanTarget.plan.id, {
       onSuccess: (result) => {
         setChangePlanTarget(null);
@@ -247,6 +268,7 @@ export function PlansPage() {
   };
 
   const handleCancel = () => {
+    track("plan_cancel_confirm", { plan: userPlan?.planId });
     cancelMutation.mutate(undefined, {
       onSuccess: () => {
         setShowCancelConfirm(false);
@@ -379,7 +401,10 @@ export function PlansPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setShowCancelConfirm(true)}
+                    onClick={() => {
+                      track("plan_cancel_open", { plan: userPlan?.planId });
+                      setShowCancelConfirm(true);
+                    }}
                     className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                   >
                     Cancelar plan
@@ -453,7 +478,12 @@ export function PlansPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => cancelPendingMutation.mutate(change.id)}
+                    onClick={() => {
+                      track("plan_pending_change_cancel", {
+                        list: change.listId,
+                      });
+                      cancelPendingMutation.mutate(change.id);
+                    }}
                     className="text-xs text-red-600 hover:underline"
                     disabled={cancelPendingMutation.isPending}
                   >
@@ -565,7 +595,10 @@ export function PlansPage() {
       <div className="mt-8 text-center text-sm text-slate-500">
         ¿Necesitas más créditos?{" "}
         <button
-          onClick={() => navigate("/app/credits")}
+          onClick={() => {
+            track("plan_credits_click", { plan: userPlan?.planId });
+            navigate("/app/credits");
+          }}
           className="text-primary hover:underline"
         >
           Comprar packs de créditos →

@@ -5,6 +5,7 @@ import {
   updateListPriceByPropertyCount,
 } from "./listService.js";
 import { listingKey, phoneKey, pickSurvivor } from "./dedupe.js";
+import { redactPayload } from "./contactPrivacy.js";
 
 // ============================================
 // Types
@@ -31,6 +32,25 @@ export interface PropertyInput {
   ownerName?: string;
   sourceUrl?: string;
   rawPayload?: Record<string, unknown>;
+  /** Owner objects to being contacted: no phone, redacted text (sticky). */
+  noContact?: boolean;
+}
+
+/**
+ * Partial update of an existing property (/update): only the fields present
+ * are changed; `null` clears m2/bedrooms/phone/ownerName. `rawPayload` is
+ * merged into the stored one. `noContact` clears the phone, redacts the
+ * stored text and flags the property for good.
+ */
+export interface PropertyPatch {
+  sourceUrl: string;
+  price?: number;
+  m2?: number | null;
+  bedrooms?: number | null;
+  phone?: string | null;
+  ownerName?: string | null;
+  rawPayload?: Record<string, unknown>;
+  noContact?: boolean;
 }
 
 export interface DuplicateInfo {
@@ -83,6 +103,7 @@ interface IndexedProperty {
   phoneKey: string | null;
   active: boolean;
   createdAt: string;
+  noContact: boolean;
 }
 
 /**
@@ -96,7 +117,9 @@ class ListIndex {
 
   static async load(listId: string): Promise<ListIndex> {
     const result = await db.execute({
-      sql: "SELECT id, source_url, phone, discontinued, created_at FROM properties WHERE list_id = ?",
+      sql: `SELECT id, source_url, phone, discontinued, created_at,
+              json_extract(raw_payload, '$.no_contactar') AS no_contact
+            FROM properties WHERE list_id = ?`,
       args: [listId],
     });
     const index = new ListIndex();
@@ -107,6 +130,7 @@ class ListIndex {
         phoneKey: phoneKey(row.phone as string | null),
         active: !row.discontinued,
         createdAt: (row.created_at as string | null) ?? "",
+        noContact: Boolean(row.no_contact),
       });
     }
     return index;
@@ -279,12 +303,15 @@ export async function uploadProperties(
 
     try {
       // Normalize data
-      const normalizedPhone = normalizePhone(prop.phone);
       const normalizedUrl = prop.sourceUrl?.trim() || null;
-      const rawPayloadJson = prop.rawPayload
-        ? JSON.stringify(prop.rawPayload)
-        : null;
       const key = listingKey(normalizedUrl);
+      const existing = index.get(key);
+      // An owner who objected stays objected: no phone, redacted text
+      const noContact = Boolean(prop.noContact || existing?.noContact);
+      const normalizedPhone = noContact ? null : normalizePhone(prop.phone);
+      const payload =
+        noContact ? redactPayload(prop.rawPayload ?? {}) : prop.rawPayload;
+      const rawPayloadJson = payload ? JSON.stringify(payload) : null;
       const phone = phoneKey(normalizedPhone);
 
       // Check for duplicates within current batch
@@ -296,7 +323,6 @@ export async function uploadProperties(
         batchKeys.add(key);
       }
 
-      const existing = index.get(key);
       if (existing) {
         // Same listing: update it
         if (existing.active && phone && phone !== existing.phoneKey) {
@@ -329,6 +355,7 @@ export async function uploadProperties(
             existing.id,
           ],
         });
+        existing.noContact = noContact;
         index.setPhone(existing, phone);
         stats.updated++;
         continue;
@@ -380,7 +407,7 @@ export async function uploadProperties(
       stats.new++;
 
       // Add to the index in case of duplicates later in the batch
-      index.add({ id, key, phoneKey: phone, active: true, createdAt: now });
+      index.add({ id, key, phoneKey: phone, active: true, createdAt: now, noContact });
     } catch (error) {
       stats.errors++;
       errors.push({
@@ -438,16 +465,20 @@ export interface UpdateResult {
 
 /**
  * Update existing properties in a list, matching by listing (listingKey of
- * the sourceUrl). Properties not found are reported in `notFound` and never
- * inserted (update-only, no upsert). A phone that another active property
- * of the list already has resolves the duplicate as in uploadProperties.
+ * the sourceUrl). Partial: only the fields present in each patch change, so
+ * `{ sourceUrl, phone: null }` just clears the phone and a `noContact` patch
+ * clears it, redacts the stored text and flags the property for good.
+ * Properties not found are reported in `notFound` and never inserted
+ * (update-only, no upsert). A phone that another active property of the
+ * list already has resolves the duplicate as in uploadProperties; the
+ * removed row counts in `duplicates`.
  */
 export async function updateProperties(
   listId: string,
-  properties: PropertyInput[],
+  patches: PropertyPatch[],
 ): Promise<UpdateResult> {
   const stats = {
-    total: properties.length,
+    total: patches.length,
     updated: 0,
     duplicates: 0,
     duplicatesRemoved: 0,
@@ -463,11 +494,11 @@ export async function updateProperties(
   // Listings already handled in this batch
   const batchKeys = new Set<string>();
 
-  for (let i = 0; i < properties.length; i++) {
-    const prop = properties[i];
+  for (let i = 0; i < patches.length; i++) {
+    const patch = patches[i];
 
     try {
-      const normalizedUrl = prop.sourceUrl?.trim() || null;
+      const normalizedUrl = patch.sourceUrl?.trim() || null;
       const key = listingKey(normalizedUrl);
 
       // Without a sourceUrl we cannot match an existing property
@@ -491,35 +522,65 @@ export async function updateProperties(
         continue;
       }
 
-      const normalizedPhone = normalizePhone(prop.phone);
-      const phone = phoneKey(normalizedPhone);
-      const rawPayloadJson = prop.rawPayload
-        ? JSON.stringify(prop.rawPayload)
-        : null;
+      const noContact = Boolean(patch.noContact || existing.noContact);
+      const sets: string[] = [];
+      const args: Array<string | number | null> = [];
+      const set = (column: string, value: string | number | null) => {
+        sets.push(`${column} = ?`);
+        args.push(value);
+      };
 
-      if (existing.active && phone && phone !== existing.phoneKey) {
-        const collision = await resolvePhoneCollision(index, existing, phone);
-        stats.duplicatesRemoved += collision.removedIds.length;
-        removedDuplicateIds.push(...collision.removedIds);
-        if (collision.rowRemoved) continue;
+      if (patch.price !== undefined) set("price", patch.price);
+      if (patch.m2 !== undefined) set("m2", patch.m2);
+      if (patch.bedrooms !== undefined) set("bedrooms", patch.bedrooms);
+      if (patch.ownerName !== undefined) {
+        set("owner_name", patch.ownerName?.trim() || null);
       }
 
-      await db.execute({
-        sql: `
-          UPDATE properties
-          SET price = ?, m2 = ?, bedrooms = ?, phone = ?, owner_name = ?, raw_payload = ?
-          WHERE id = ?
-        `,
-        args: [
-          prop.price,
-          prop.m2 ?? null,
-          prop.bedrooms ?? null,
-          normalizedPhone,
-          prop.ownerName?.trim() ?? null,
-          rawPayloadJson,
-          existing.id,
-        ],
-      });
+      // Phone: cleared for good if the owner objected
+      let phone = existing.phoneKey;
+      if (noContact) {
+        set("phone", null);
+        phone = null;
+      } else if (patch.phone !== undefined) {
+        const normalizedPhone = normalizePhone(patch.phone ?? undefined);
+        phone = phoneKey(normalizedPhone);
+        if (existing.active && phone && phone !== existing.phoneKey) {
+          const collision = await resolvePhoneCollision(index, existing, phone);
+          stats.duplicatesRemoved += collision.removedIds.length;
+          removedDuplicateIds.push(...collision.removedIds);
+          if (collision.rowRemoved) {
+            stats.duplicates++;
+            continue;
+          }
+        }
+        set("phone", normalizedPhone);
+      }
+
+      // raw_payload: merged, and redacted if the owner objected
+      if (patch.rawPayload || (patch.noContact && !existing.noContact)) {
+        const current = await db.execute({
+          sql: "SELECT raw_payload FROM properties WHERE id = ?",
+          args: [existing.id],
+        });
+        let merged: Record<string, unknown> = {};
+        try {
+          const stored = current.rows[0]?.raw_payload as string | null;
+          if (stored) merged = JSON.parse(stored) as Record<string, unknown>;
+        } catch {
+          // Unreadable stored payload: rebuild it from the patch
+        }
+        merged = { ...merged, ...(patch.rawPayload ?? {}) };
+        set("raw_payload", JSON.stringify(noContact ? redactPayload(merged) : merged));
+      }
+
+      if (sets.length > 0) {
+        await db.execute({
+          sql: `UPDATE properties SET ${sets.join(", ")} WHERE id = ?`,
+          args: [...args, existing.id],
+        });
+      }
+      existing.noContact = noContact;
       index.setPhone(existing, phone);
       stats.updated++;
     } catch (error) {
@@ -959,6 +1020,7 @@ export interface FotocasaRawProperty {
   anunciante?: string;
   fecha_scraping?: string;
   telefono?: string | null; // "+34621194093" or "621194093" or null
+  no_contactar?: boolean | null; // owner objects to being contacted
 }
 
 export interface FotocasaUpload {
@@ -973,11 +1035,13 @@ export interface FotocasaUpload {
  * Convert Fotocasa raw property to internal PropertyInput format
  */
 export function parseFotocasaProperty(raw: FotocasaRawProperty): PropertyInput {
+  const noContact = raw.no_contactar === true;
   return {
     price: parseIdealistaPrice(raw.precio), // Same format "X.XXX €"
     m2: parseIdealistaM2(raw.metros),
     bedrooms: parseIdealistaBedrooms(raw.habitaciones), // Works for both "3 hab." and "3 habs"
-    phone: raw.telefono ?? undefined,
+    phone: noContact ? undefined : (raw.telefono ?? undefined),
+    noContact,
     sourceUrl: raw.url,
     ownerName: raw.anunciante,
     // Store the full raw data for reference
@@ -998,6 +1062,69 @@ export function parseFotocasaProperty(raw: FotocasaRawProperty): PropertyInput {
  */
 export function parseFotocasaUpload(data: FotocasaUpload): PropertyInput[] {
   return data.viviendas.map(parseFotocasaProperty);
+}
+
+// ============================================
+// /update patches (partial records)
+// ============================================
+
+/** A raw record of /update: only `url` is required. */
+export type RawPropertyPatch = Partial<
+  Omit<FotocasaRawProperty, "precio" | "url" | "anunciante">
+> & {
+  url: string;
+  precio?: string | null;
+  anunciante?: string | null;
+};
+
+const RAW_PAYLOAD_FIELDS: Array<[keyof RawPropertyPatch, string]> = [
+  ["titulo", "titulo"],
+  ["ubicacion", "ubicacion"],
+  ["descripcion", "descripcion"],
+  ["fecha_scraping", "fecha_scraping"],
+  ["precio", "precio_original"],
+  ["habitaciones", "habitaciones_original"],
+  ["metros", "metros_original"],
+];
+
+/**
+ * Raw (Idealista/Fotocasa) record → PropertyPatch with ONLY the fields the
+ * record carries. `{url, telefono: null, no_contactar: true}` becomes a
+ * patch that clears the phone and nothing else.
+ */
+export function parseRawPatch(raw: RawPropertyPatch): PropertyPatch {
+  const patch: PropertyPatch = { sourceUrl: raw.url };
+  const has = (field: keyof RawPropertyPatch) =>
+    Object.prototype.hasOwnProperty.call(raw, field);
+
+  if (typeof raw.precio === "string") patch.price = parseIdealistaPrice(raw.precio);
+  if (has("metros")) patch.m2 = parseIdealistaM2(raw.metros) ?? null;
+  if (has("habitaciones")) {
+    patch.bedrooms = parseIdealistaBedrooms(raw.habitaciones) ?? null;
+  }
+  if (has("telefono")) patch.phone = raw.telefono ?? null;
+  if (has("anunciante")) patch.ownerName = raw.anunciante ?? null;
+  if (raw.no_contactar === true) patch.noContact = true;
+
+  const rawPayload: Record<string, unknown> = {};
+  for (const [field, stored] of RAW_PAYLOAD_FIELDS) {
+    if (has(field)) rawPayload[stored] = raw[field];
+  }
+  if (Object.keys(rawPayload).length > 0) patch.rawPayload = rawPayload;
+  return patch;
+}
+
+/** Simplified-format property → PropertyPatch (fields present only). */
+export function toPropertyPatch(prop: PropertyPatch): PropertyPatch {
+  const patch: PropertyPatch = { sourceUrl: prop.sourceUrl };
+  if (prop.price !== undefined) patch.price = prop.price;
+  if (prop.m2 !== undefined) patch.m2 = prop.m2;
+  if (prop.bedrooms !== undefined) patch.bedrooms = prop.bedrooms;
+  if (prop.phone !== undefined) patch.phone = prop.phone;
+  if (prop.ownerName !== undefined) patch.ownerName = prop.ownerName;
+  if (prop.rawPayload !== undefined) patch.rawPayload = prop.rawPayload;
+  if (prop.noContact) patch.noContact = true;
+  return patch;
 }
 
 /**

@@ -16,12 +16,18 @@ import {
   parseFotocasaUpload,
   bulkDiscontinueByUrls,
   dedupeLists,
+  parseRawPatch,
+  toPropertyPatch,
   type PropertyInput,
+  type PropertyPatch,
 } from "../services/propertyService.js";
 import {
   automationUploadSimplifiedSchema,
   automationUploadIdealistaSchema,
   automationUploadFotocasaSchema,
+  automationUpdateSimplifiedSchema,
+  automationUpdateIdealistaSchema,
+  automationUpdateFotocasaSchema,
   discontinuedPropertyParamSchema,
   discontinuedPropertyBodySchema,
   bulkDiscontinuedSchema,
@@ -320,6 +326,12 @@ export async function automationRoutes(fastify: FastifyInstance) {
    * any property whose sourceUrl is not found is skipped and reported
    * in the `notFound` array.
    *
+   * Partial: each record only needs its url; the fields it carries are
+   * changed and the rest are left as they are (`null` clears m2, bedrooms,
+   * phone or owner). `{ "url": ..., "telefono": null, "no_contactar": true }`
+   * removes the phone, redacts phones/emails from the stored text and flags
+   * the property so no later upload brings the phone back.
+   *
    * Supports the same three formats as /upload: simplified, Idealista,
    * and Fotocasa (auto-detected).
    *
@@ -340,14 +352,14 @@ export async function automationRoutes(fastify: FastifyInstance) {
       const body = request.body as AutomationUploadBody;
 
       let listId: string;
-      let properties: PropertyInput[];
+      let patches: PropertyPatch[];
 
       // Detect format: Fotocasa first, then Idealista, then simplified
       const isFotocasa = isFotocasaFormat(body);
       const isIdealista = !isFotocasa && isIdealistaFormat(body);
 
       if (isFotocasa) {
-        const validation = zodValidate(automationUploadFotocasaSchema, body);
+        const validation = zodValidate(automationUpdateFotocasaSchema, body);
         if (!validation.success) {
           return reply.status(400).send({
             error: "Validation failed",
@@ -355,10 +367,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
           });
         }
 
-        properties = parseFotocasaUpload({
-          ubicacion: validation.data.ubicacion,
-          viviendas: validation.data.viviendas,
-        });
+        patches = validation.data.viviendas.map(parseRawPatch);
 
         const ubicacion = validation.data.ubicacion;
 
@@ -376,7 +385,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
           listId = list.id;
         }
       } else if (isIdealista) {
-        const validation = zodValidate(automationUploadIdealistaSchema, body);
+        const validation = zodValidate(automationUpdateIdealistaSchema, body);
         if (!validation.success) {
           return reply.status(400).send({
             error: "Validation failed",
@@ -384,9 +393,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
           });
         }
 
-        properties = parseIdealistaUpload({
-          viviendas: validation.data.viviendas,
-        });
+        patches = validation.data.viviendas.todas.map(parseRawPatch);
 
         if (validation.data.listId) {
           const list = await getListById(validation.data.listId);
@@ -409,7 +416,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
           });
         }
       } else {
-        const validation = zodValidate(automationUploadSimplifiedSchema, body);
+        const validation = zodValidate(automationUpdateSimplifiedSchema, body);
         if (!validation.success) {
           return reply.status(400).send({
             error: "Validation failed",
@@ -417,7 +424,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
           });
         }
 
-        properties = validation.data.properties;
+        patches = validation.data.properties.map(toPropertyPatch);
 
         if (validation.data.listId) {
           const list = await getListById(validation.data.listId);
@@ -442,7 +449,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
       }
 
       // Update existing properties (no inserts)
-      const result = await updateProperties(listId, properties);
+      const result = await updateProperties(listId, patches);
 
       request.log.info({
         msg: "Automation update completed",

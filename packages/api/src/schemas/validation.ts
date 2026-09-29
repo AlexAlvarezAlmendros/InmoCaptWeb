@@ -142,6 +142,23 @@ export const fotocasaPropertySchema = z.object({
   anunciante: z.string().optional(),
   fecha_scraping: z.string().optional(),
   telefono: z.string().nullable().optional(), // "+34621194093" or "621194093" or null
+  no_contactar: z.boolean().nullable().optional(), // owner objects to being contacted
+});
+
+// /update records are partial: only the url is required and null clears a
+// field ({url, telefono: null, no_contactar: true} only removes the phone)
+export const rawPropertyPatchSchema = fotocasaPropertySchema.partial().extend({
+  url: z.string().url(),
+  precio: z.string().nullable().optional(),
+  anunciante: z.string().nullable().optional(),
+});
+
+export const propertyPatchSchema = propertyInputSchema.partial().extend({
+  sourceUrl: z.string().url(),
+  m2: z.number().int().min(0).nullable().optional(),
+  bedrooms: z.number().int().min(0).nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+  ownerName: z.string().max(200).nullable().optional(),
 });
 
 // Schema for Idealista JSON format
@@ -270,6 +287,44 @@ export const automationUploadFotocasaSchema = z.object({
   total: z.number().optional(),
   viviendas: z
     .array(fotocasaPropertySchema)
+    .min(1, "At least one property is required"),
+});
+
+// Schemas for automation /update (partial records, same list identification)
+export const automationUpdateSimplifiedSchema = z
+  .object({
+    listId: z.string().uuid("Invalid list ID").optional(),
+    listName: z.string().min(1).max(200).optional(),
+    location: z.string().min(1).max(500).optional(),
+    properties: z
+      .array(propertyPatchSchema)
+      .min(1, "At least one property is required"),
+  })
+  .refine((data) => data.listId || (data.listName && data.location), {
+    message: "Either listId or both listName and location are required",
+  });
+
+export const automationUpdateIdealistaSchema = z
+  .object({
+    listId: z.string().uuid("Invalid list ID").optional(),
+    listName: z.string().min(1).max(200).optional(),
+    location: z.string().min(1).max(500).optional(),
+    timestamp: z.string().optional(),
+    url: z.string().optional(),
+    total: z.number().optional(),
+    viviendas: z.object({
+      todas: z
+        .array(rawPropertyPatchSchema)
+        .min(1, "At least one property is required"),
+    }),
+  })
+  .refine((data) => data.listId || (data.listName && data.location), {
+    message: "Either listId or both listName and location are required",
+  });
+
+export const automationUpdateFotocasaSchema = automationUploadFotocasaSchema.extend({
+  viviendas: z
+    .array(rawPropertyPatchSchema)
     .min(1, "At least one property is required"),
 });
 

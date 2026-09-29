@@ -3,20 +3,17 @@
 // throwaway SQLite file built from src/db/schema.sql.
 import { after, before, beforeEach, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import {
+  UPLOADER,
+  closeDb,
+  createList,
+  initDb,
+  insertRaw,
+  resetData,
+  reveal,
+  rows,
+} from "./helpers.js";
 
-const dir = mkdtempSync(join(tmpdir(), "inmocapt-dedupe-"));
-process.env.NODE_ENV = "test";
-process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
-process.env.AUTH0_DOMAIN ??= "test.local";
-process.env.AUTH0_AUDIENCE ??= "test";
-process.env.STRIPE_SECRET_KEY ??= "sk_test_dummy";
-process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_dummy";
-
-const { db, runMigrations } = await import("../src/config/database.js");
 const {
   uploadProperties,
   updateProperties,
@@ -25,77 +22,20 @@ const {
 } = await import("../src/services/propertyService.js");
 const { listingKey, phoneKey } = await import("../src/services/dedupe.js");
 
-const UPLOADER = "system:automation";
-const AGENT = "auth0|agent";
 let listA: string;
 let listB: string;
 
-async function createList(name: string): Promise<string> {
-  const id = randomUUID();
-  await db.execute({
-    sql: "INSERT INTO lists (id, name, location, price_cents) VALUES (?, ?, ?, 0)",
-    args: [id, name, name],
-  });
-  return id;
-}
-
-async function rows(listId: string) {
-  const result = await db.execute({
-    sql: "SELECT id, source_url, phone, discontinued FROM properties WHERE list_id = ? ORDER BY created_at, id",
-    args: [listId],
-  });
-  return result.rows;
-}
-
-async function insertRaw(
-  listId: string,
-  url: string,
-  phone: string | null,
-  createdAt: string,
-  discontinued = 0,
-): Promise<string> {
-  const id = randomUUID();
-  await db.execute({
-    sql: `INSERT INTO properties (id, list_id, price, phone, source_url, discontinued, created_at)
-          VALUES (?, ?, 100000, ?, ?, ?, ?)`,
-    args: [id, listId, phone, url, discontinued, createdAt],
-  });
-  return id;
-}
-
-async function reveal(propertyId: string): Promise<void> {
-  await db.execute({
-    sql: "INSERT INTO user_property_reveals (user_id, property_id) VALUES (?, ?)",
-    args: [AGENT, propertyId],
-  });
-}
-
 const prop = (sourceUrl: string, phone?: string) => ({ price: 150000, sourceUrl, phone });
 
-before(async () => {
-  await db.executeMultiple(
-    readFileSync(new URL("../src/db/schema.sql", import.meta.url), "utf-8"),
-  );
-  await runMigrations();
-  await db.execute({
-    sql: "INSERT INTO users (id, email) VALUES (?, ?), (?, ?)",
-    args: [UPLOADER, "automation@system.local", AGENT, "agent@example.com"],
-  });
-});
+before(initDb);
 
 beforeEach(async () => {
-  await db.execute("DELETE FROM user_property_reveals");
-  await db.execute("DELETE FROM properties");
-  await db.execute("DELETE FROM list_updates");
-  await db.execute("DELETE FROM lists");
+  await resetData();
   listA = await createList("Maresme");
   listB = await createList("Barcelona - Eixample");
 });
 
-after(() => {
-  db.close();
-  rmSync(dir, { recursive: true, force: true });
-});
+after(closeDb);
 
 describe("listingKey / phoneKey", () => {
   test("URL variants of one listing share the key", () => {

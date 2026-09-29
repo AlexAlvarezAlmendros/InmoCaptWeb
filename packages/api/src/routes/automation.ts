@@ -15,6 +15,7 @@ import {
   parseIdealistaUpload,
   parseFotocasaUpload,
   bulkDiscontinueByUrls,
+  dedupeLists,
   type PropertyInput,
 } from "../services/propertyService.js";
 import {
@@ -24,6 +25,7 @@ import {
   discontinuedPropertyParamSchema,
   discontinuedPropertyBodySchema,
   bulkDiscontinuedSchema,
+  dedupeListsSchema,
   zodValidate,
 } from "../schemas/validation.js";
 import {
@@ -55,6 +57,12 @@ export async function automationRoutes(fastify: FastifyInstance) {
    *
    * Upload properties to a list via API key authentication.
    * Supports three formats: simplified, Idealista, and Fotocasa.
+   *
+   * Additive: never removes what is not in the payload. Within the list a
+   * property is never stored twice: the same listing (portal ad id, whatever
+   * the URL variant) is updated, and a new listing whose phone an active
+   * property of the list already has is skipped (`duplicates`, reason
+   * "phone"). The same property may be in other lists.
    *
    * List identification (one of):
    * - listId: Direct UUID of the list
@@ -293,6 +301,11 @@ export async function automationRoutes(fastify: FastifyInstance) {
         listCreated,
         stats: result.stats,
         notifications: emailStats,
+        duplicates: result.duplicates.length > 0 ? result.duplicates : undefined,
+        removedDuplicateIds:
+          result.removedDuplicateIds.length > 0
+            ? result.removedDuplicateIds
+            : undefined,
         errors: result.errors.length > 0 ? result.errors : undefined,
       };
     },
@@ -302,7 +315,7 @@ export async function automationRoutes(fastify: FastifyInstance) {
    * POST /automation/update
    *
    * Update EXISTING properties in a list via API key authentication.
-   * Properties are matched by their sourceUrl (same key used by /upload
+   * Properties are matched by their listing (same key used by /upload
    * for deduplication). Unlike /upload, nothing new is ever inserted:
    * any property whose sourceUrl is not found is skipped and reported
    * in the `notFound` array.
@@ -442,6 +455,10 @@ export async function automationRoutes(fastify: FastifyInstance) {
         listId,
         stats: result.stats,
         notFound: result.notFound.length > 0 ? result.notFound : undefined,
+        removedDuplicateIds:
+          result.removedDuplicateIds.length > 0
+            ? result.removedDuplicateIds
+            : undefined,
         errors: result.errors.length > 0 ? result.errors : undefined,
       };
     },
@@ -567,6 +584,41 @@ export async function automationRoutes(fastify: FastifyInstance) {
           affectedLists: result.affectedListIds.length,
         },
         "Bulk discontinue completed",
+      );
+
+      return { success: true, data: result };
+    },
+  );
+
+  /**
+   * POST /automation/dedupe
+   *
+   * Consolidate duplicates already stored inside lists (e.g. uploaded before
+   * /upload deduplicated by phone): active properties of the SAME list that
+   * are the same listing or share a phone. Per group the property with
+   * reveals/agent state survives (else the oldest); properties anyone has
+   * interacted with are never deleted. Other lists are never touched.
+   *
+   * Body: { "listId"?: uuid (default: all lists), "dryRun"?: boolean }
+   * dryRun defaults to TRUE: it only reports what would be deleted.
+   *
+   * Headers:
+   * - X-API-Key: Your automation API key
+   */
+  fastify.post(
+    "/dedupe",
+    { preHandler: [authenticateApiKey] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const validation = zodValidate(dedupeListsSchema, request.body ?? {});
+      if (!validation.success) {
+        return reply.code(400).send({ error: validation.error });
+      }
+
+      const result = await dedupeLists(validation.data);
+
+      request.log.info(
+        { dryRun: result.dryRun, ...result.totals, lists: result.lists.length },
+        "Dedupe lists completed",
       );
 
       return { success: true, data: result };

@@ -303,6 +303,14 @@ export const bulkDiscontinuedSchema = z.object({
 
 export type BulkDiscontinuedInput = z.infer<typeof bulkDiscontinuedSchema>;
 
+// Schema for consolidating duplicates already stored inside lists
+export const dedupeListsSchema = z.object({
+  listId: z.string().uuid("Invalid list ID").optional(),
+  dryRun: z.boolean().default(true),
+});
+
+export type DedupeListsInput = z.infer<typeof dedupeListsSchema>;
+
 // ============================================
 // Helper for Fastify validation
 // ============================================

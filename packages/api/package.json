@@ -10,7 +10,8 @@
 		"db:init": "tsx src/initDb.ts",
 		"stripe:seed": "tsx src/stripeSeed.ts",
 		"lint": "eslint . --ext ts --report-unused-disable-directives --max-warnings 0",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"test": "node --import tsx --test test/*.test.ts"
 	},
 	"dependencies": {
 		"@fastify/cors": "^9.0.1",

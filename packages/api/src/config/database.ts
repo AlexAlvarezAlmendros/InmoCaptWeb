@@ -198,6 +198,10 @@ export async function runMigrations(): Promise<void> {
       sql: "CREATE INDEX IF NOT EXISTS idx_pending_list_changes_user ON pending_list_changes(user_id, applied_at)",
       description: "Index pending_list_changes by user",
     },
+    {
+      sql: "CREATE INDEX IF NOT EXISTS idx_properties_source_url ON properties(source_url)",
+      description: "Index properties by source_url (bulk discontinue)",
+    },
   ];
 
   for (const migration of migrations) {

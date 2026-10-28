@@ -178,7 +178,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
         properties = validation.data.properties;
       }
 
-      // Upload properties (deduplication by URL happens inside)
+      // Upload properties (deduplication within the list happens inside)
       const result = await uploadProperties(listId, properties, authUser.sub);
 
       // Notify subscribers if new properties were added

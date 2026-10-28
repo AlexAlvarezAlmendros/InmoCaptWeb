@@ -80,6 +80,14 @@ export type AnalyticsEvent =
   | "subscription_cancel_confirm"
   | "subscription_search"
   | "billing_portal_open"
+  // Equipo
+  | "team_invite_send"
+  | "team_invite_error"
+  | "team_invite_cancel"
+  | "team_invite_accept"
+  | "team_invite_decline"
+  | "team_member_remove"
+  | "team_leave"
   // Cuenta
   | "account_preferences_save"
   | "account_password_reset_request"

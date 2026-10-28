@@ -195,6 +195,46 @@ CREATE TABLE IF NOT EXISTS pending_list_changes (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- ─────────────────────────────────────────────────────────────
+-- Teams: members share the owner's lists, contact reveals and notes.
+-- Credits stay per user. Every member must be on the team's plan.
+-- ─────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS teams (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,  -- manages the shared lists
+  plan_id TEXT NOT NULL REFERENCES plans(id),
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- One row per member, owner included. A user belongs to at most one team.
+CREATE TABLE IF NOT EXISTS team_members (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  joined_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS team_invitations (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,              -- lowercased
+  invited_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'pending',    -- pending, accepted, declined, canceled
+  created_at TEXT DEFAULT (datetime('now')),
+  responded_at TEXT
+);
+
+-- Shared property state/notes for team members (instead of property_agent_state)
+CREATE TABLE IF NOT EXISTS team_property_state (
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  state TEXT DEFAULT 'new',
+  comment TEXT,
+  updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (team_id, property_id)
+);
+
 -- Seed: initial plans. max_lists NULL = unlimited. price_cents in EUR cents.
 INSERT OR IGNORE INTO plans (id, name, price_cents, max_lists, monthly_credits, trial_duration_days, sort_order)
 VALUES
@@ -224,3 +264,6 @@ CREATE INDEX IF NOT EXISTS idx_user_list_access_user ON user_list_access(user_id
 CREATE INDEX IF NOT EXISTS idx_credit_tx_user ON credit_transactions(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_reveals_user ON user_property_reveals(user_id);
 CREATE INDEX IF NOT EXISTS idx_pending_list_changes_user ON pending_list_changes(user_id, applied_at);
+CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id);
+CREATE INDEX IF NOT EXISTS idx_team_invitations_email ON team_invitations(email, status);
+CREATE INDEX IF NOT EXISTS idx_team_invitations_team ON team_invitations(team_id, status);

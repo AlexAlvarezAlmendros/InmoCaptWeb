@@ -4,6 +4,7 @@ import { listsRoutes } from "./lists.js";
 import { billingRoutes } from "./billing.js";
 import { plansRoutes } from "./plans.js";
 import { creditsRoutes } from "./credits.js";
+import { teamRoutes } from "./team.js";
 import { adminRoutes } from "./admin.js";
 import { listRequestsRoutes } from "./listRequests.js";
 import { automationRoutes } from "./automation.js";
@@ -23,6 +24,9 @@ export async function registerRoutes(fastify: FastifyInstance) {
 
   // Credits (top-ups + balance)
   await fastify.register(creditsRoutes, { prefix: "/api/credits" });
+
+  // Teams (shared lists, reveals and notes)
+  await fastify.register(teamRoutes, { prefix: "/api/team" });
 
   // List requests routes
   await fastify.register(listRequestsRoutes, { prefix: "/api/list-requests" });

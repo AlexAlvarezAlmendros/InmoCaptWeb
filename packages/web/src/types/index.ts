@@ -164,6 +164,59 @@ export interface UserPlanData {
   credits: CreditBalance;
   listAccess: string[];
   pendingListChanges: PendingListChange[];
+  /** Set when the user is in a team: lists and list changes are then the owner's. */
+  team: UserTeamSummary | null;
+}
+
+export interface UserTeamSummary {
+  id: string;
+  planId: string;
+  isOwner: boolean;
+  ownerEmail: string;
+  memberCount: number;
+}
+
+// Teams — shared lists, reveals and notes; credits stay per user
+
+export interface TeamMember {
+  userId: string;
+  email: string;
+  isOwner: boolean;
+  joinedAt: string;
+}
+
+export interface TeamInvitation {
+  id: string;
+  email: string;
+  createdAt: string;
+}
+
+export interface Team {
+  id: string;
+  planId: string;
+  planName: string;
+  ownerId: string;
+  ownerEmail: string;
+  isOwner: boolean;
+  maxMembers: number;
+  members: TeamMember[];
+  /** Only filled for the owner */
+  pendingInvitations: TeamInvitation[];
+}
+
+export interface IncomingTeamInvitation {
+  id: string;
+  ownerEmail: string;
+  planId: string;
+  planName: string;
+  createdAt: string;
+  /** Whether the user's current plan lets them accept */
+  planMatches: boolean;
+}
+
+export interface TeamData {
+  team: Team | null;
+  invitations: IncomingTeamInvitation[];
 }
 
 export interface CreditPack {

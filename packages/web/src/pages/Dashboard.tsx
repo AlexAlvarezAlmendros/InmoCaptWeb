@@ -244,6 +244,10 @@ export function DashboardPage() {
     ? "Listas ilimitadas"
     : `${usedSlots} / ${maxLists} listas usadas`;
 
+  // In a team only the owner chooses the lists; the rest work on them
+  const teamOwnerEmail =
+    userPlan.team && !userPlan.team.isOwner ? userPlan.team.ownerEmail : null;
+
   return (
     <div className="space-y-8">
       {checkoutStatus === "success" && (
@@ -283,8 +287,23 @@ export function DashboardPage() {
         </div>
       )}
 
+      {teamOwnerEmail && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-slate-700 dark:border-primary/40 dark:bg-primary/10 dark:text-slate-300">
+          Trabajas con las listas del equipo de{" "}
+          <span className="font-medium">{teamOwnerEmail}</span>. Solo esa
+          persona puede cambiarlas. Los contactos desbloqueados y las notas son
+          comunes a todo el equipo.{" "}
+          <button
+            onClick={() => navigate("/app/team")}
+            className="text-primary underline hover:no-underline"
+          >
+            Ver equipo
+          </button>
+        </div>
+      )}
+
       {/* Pending changes banner */}
-      {userPlan.pendingListChanges.length > 0 && (
+      {!teamOwnerEmail && userPlan.pendingListChanges.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
           <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
             Tienes {userPlan.pendingListChanges.length} cambio
@@ -322,8 +341,9 @@ export function DashboardPage() {
           <Card>
             <CardContent>
               <div className="py-6 text-center text-slate-500">
-                Aún no has elegido ninguna lista. Selecciónala del catálogo
-                abajo.
+                {teamOwnerEmail
+                  ? "El equipo aún no tiene listas activas."
+                  : "Aún no has elegido ninguna lista. Selecciónala del catálogo abajo."}
               </div>
             </CardContent>
           </Card>
@@ -347,68 +367,71 @@ export function DashboardPage() {
       </section>
 
       {/* Catalog */}
-      <section>
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-            {slotsAvailable ? "Añadir listas" : "Cambiar listas"}
-          </h2>
-          <Input
-            type="text"
-            placeholder="Buscar por nombre o ubicación..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="sm:w-72"
-          />
-        </div>
-
-        {!slotsAvailable && (
-          <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
-            Has usado las {maxLists} listas de tu plan. Puedes programar un
-            cambio que se aplicará al renovar, o{" "}
-            <button
-              onClick={() => {
-                track("dashboard_upgrade_click", { location: "no_slots" });
-                navigate("/app/plans");
-              }}
-              className="text-primary underline hover:no-underline"
-            >
-              subir de plan
-            </button>{" "}
-            para añadir más al instante.
+      {!teamOwnerEmail && (
+        <section>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+              {slotsAvailable ? "Añadir listas" : "Cambiar listas"}
+            </h2>
+            <Input
+              type="text"
+              placeholder="Buscar por nombre o ubicación..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="sm:w-72"
+            />
           </div>
-        )}
 
-        {filteredCatalog.length === 0 ? (
-          <Card>
-            <CardContent>
-              <div className="py-6 text-center text-slate-500">
-                {searchQuery
-                  ? `No hay listas para "${searchQuery}".`
-                  : "No hay más listas en el catálogo."}
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredCatalog.map((list) => {
-              const pending = pendingByListId.get(list.id);
-              return (
-                <CatalogListCard
-                  key={list.id}
-                  list={list}
-                  pending={pending}
-                  slotsAvailable={slotsAvailable}
-                  isActivating={
-                    activateList.isPending && activateList.variables === list.id
-                  }
-                  onActivate={() => handleActivate(list)}
-                  onSwap={() => openSwapModal(list)}
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
+          {!slotsAvailable && (
+            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+              Has usado las {maxLists} listas de tu plan. Puedes programar un
+              cambio que se aplicará al renovar, o{" "}
+              <button
+                onClick={() => {
+                  track("dashboard_upgrade_click", { location: "no_slots" });
+                  navigate("/app/plans");
+                }}
+                className="text-primary underline hover:no-underline"
+              >
+                subir de plan
+              </button>{" "}
+              para añadir más al instante.
+            </div>
+          )}
+
+          {filteredCatalog.length === 0 ? (
+            <Card>
+              <CardContent>
+                <div className="py-6 text-center text-slate-500">
+                  {searchQuery
+                    ? `No hay listas para "${searchQuery}".`
+                    : "No hay más listas en el catálogo."}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {filteredCatalog.map((list) => {
+                const pending = pendingByListId.get(list.id);
+                return (
+                  <CatalogListCard
+                    key={list.id}
+                    list={list}
+                    pending={pending}
+                    slotsAvailable={slotsAvailable}
+                    isActivating={
+                      activateList.isPending &&
+                      activateList.variables === list.id
+                    }
+                    onActivate={() => handleActivate(list)}
+                    onSwap={() => openSwapModal(list)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Request new list */}
       <section>

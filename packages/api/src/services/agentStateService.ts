@@ -1,4 +1,5 @@
 import { db } from "../config/database.js";
+import { getTeamContext } from "./teamService.js";
 
 // ============================================
 // Types
@@ -106,19 +107,38 @@ export interface PaginatedProperties {
 // ============================================
 
 /**
+ * Where a user's property state/notes live: the shared team_property_state
+ * while in a team, property_agent_state otherwise. Both tables expose the
+ * same state / comment / updated_at columns.
+ */
+interface StateSource {
+  table: "team_property_state" | "property_agent_state";
+  keyColumn: "team_id" | "user_id";
+  key: string;
+}
+
+async function getStateSource(userId: string): Promise<StateSource> {
+  const ctx = await getTeamContext(userId);
+  return ctx
+    ? { table: "team_property_state", keyColumn: "team_id", key: ctx.teamId }
+    : { table: "property_agent_state", keyColumn: "user_id", key: userId };
+}
+
+/**
  * Get a property's agent state
  */
 export async function getPropertyAgentState(
   userId: string,
   propertyId: string,
 ): Promise<PropertyAgentState | null> {
+  const source = await getStateSource(userId);
   const result = await db.execute({
     sql: `
-      SELECT user_id, property_id, state, comment, updated_at
-      FROM property_agent_state
-      WHERE user_id = ? AND property_id = ?
+      SELECT property_id, state, comment, updated_at
+      FROM ${source.table}
+      WHERE ${source.keyColumn} = ? AND property_id = ?
     `,
-    args: [userId, propertyId],
+    args: [source.key, propertyId],
   });
 
   if (result.rows.length === 0) {
@@ -127,7 +147,7 @@ export async function getPropertyAgentState(
 
   const row = result.rows[0];
   return {
-    userId: row.user_id as string,
+    userId,
     propertyId: row.property_id as string,
     state: row.state as PropertyState,
     comment: row.comment as string | null,
@@ -144,17 +164,30 @@ export async function updatePropertyState(
   state: PropertyState,
 ): Promise<PropertyAgentState> {
   const now = new Date().toISOString();
+  const ctx = await getTeamContext(userId);
 
   // Upsert: insert or update
-  await db.execute({
-    sql: `
-      INSERT INTO property_agent_state (user_id, property_id, state, updated_at)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT (user_id, property_id) 
-      DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at
-    `,
-    args: [userId, propertyId, state, now],
-  });
+  if (ctx) {
+    await db.execute({
+      sql: `
+        INSERT INTO team_property_state (team_id, property_id, state, updated_by, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT (team_id, property_id)
+        DO UPDATE SET state = excluded.state, updated_by = excluded.updated_by, updated_at = excluded.updated_at
+      `,
+      args: [ctx.teamId, propertyId, state, userId, now],
+    });
+  } else {
+    await db.execute({
+      sql: `
+        INSERT INTO property_agent_state (user_id, property_id, state, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT (user_id, property_id) 
+        DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at
+      `,
+      args: [userId, propertyId, state, now],
+    });
+  }
 
   return {
     userId,
@@ -174,17 +207,30 @@ export async function updatePropertyComment(
   comment: string,
 ): Promise<PropertyAgentState> {
   const now = new Date().toISOString();
+  const ctx = await getTeamContext(userId);
 
   // Upsert: insert or update
-  await db.execute({
-    sql: `
-      INSERT INTO property_agent_state (user_id, property_id, state, comment, updated_at)
-      VALUES (?, ?, 'new', ?, ?)
-      ON CONFLICT (user_id, property_id) 
-      DO UPDATE SET comment = excluded.comment, updated_at = excluded.updated_at
-    `,
-    args: [userId, propertyId, comment, now],
-  });
+  if (ctx) {
+    await db.execute({
+      sql: `
+        INSERT INTO team_property_state (team_id, property_id, state, comment, updated_by, updated_at)
+        VALUES (?, ?, 'new', ?, ?, ?)
+        ON CONFLICT (team_id, property_id)
+        DO UPDATE SET comment = excluded.comment, updated_by = excluded.updated_by, updated_at = excluded.updated_at
+      `,
+      args: [ctx.teamId, propertyId, comment, userId, now],
+    });
+  } else {
+    await db.execute({
+      sql: `
+        INSERT INTO property_agent_state (user_id, property_id, state, comment, updated_at)
+        VALUES (?, ?, 'new', ?, ?)
+        ON CONFLICT (user_id, property_id) 
+        DO UPDATE SET comment = excluded.comment, updated_at = excluded.updated_at
+      `,
+      args: [userId, propertyId, comment, now],
+    });
+  }
 
   // Fetch the current state
   const current = await getPropertyAgentState(userId, propertyId);
@@ -204,6 +250,11 @@ export async function getPropertiesWithAgentState(
   // Shared free-text search + price range filters (data, count, stateCounts)
   const searchFilters = buildSearchFilters(options);
 
+  // Personal or team state/notes
+  const source = await getStateSource(userId);
+  const stateJoin = `LEFT JOIN ${source.table} pas
+      ON pas.property_id = p.id AND pas.${source.keyColumn} = ?`;
+
   // Build the query
   let sql = `
     SELECT 
@@ -222,12 +273,11 @@ export async function getPropertiesWithAgentState(
       pas.comment,
       pas.updated_at as stateUpdatedAt
     FROM properties p
-    LEFT JOIN property_agent_state pas 
-      ON pas.property_id = p.id AND pas.user_id = ?
+    ${stateJoin}
     WHERE p.list_id = ?
   `;
 
-  const args: (string | number)[] = [userId, listId];
+  const args: (string | number)[] = [source.key, listId];
 
   // Filter by state
   if (stateFilter !== "all") {
@@ -259,11 +309,10 @@ export async function getPropertiesWithAgentState(
   let countSql = `
     SELECT COUNT(*) as count
     FROM properties p
-    LEFT JOIN property_agent_state pas 
-      ON pas.property_id = p.id AND pas.user_id = ?
+    ${stateJoin}
     WHERE p.list_id = ?
   `;
-  const countArgs: (string | number)[] = [userId, listId];
+  const countArgs: (string | number)[] = [source.key, listId];
 
   if (stateFilter !== "all") {
     if (stateFilter === "new") {
@@ -331,11 +380,10 @@ export async function getPropertiesWithAgentState(
       COALESCE(pas.state, 'new') as state,
       COUNT(*) as count
     FROM properties p
-    LEFT JOIN property_agent_state pas
-      ON pas.property_id = p.id AND pas.user_id = ?
+    ${stateJoin}
     WHERE p.list_id = ?
   `;
-  const stateCountsArgs: (string | number)[] = [userId, listId];
+  const stateCountsArgs: (string | number)[] = [source.key, listId];
   stateCountsSql += searchFilters.clause;
   stateCountsArgs.push(...searchFilters.params);
   stateCountsSql += " GROUP BY COALESCE(pas.state, 'new')";

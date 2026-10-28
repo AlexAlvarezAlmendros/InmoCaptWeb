@@ -177,6 +177,48 @@ export async function runMigrations(): Promise<void> {
       )`,
       description: "Create pending_list_changes table (v2)",
     },
+    // ── Teams ────────────────────────────────────────────────────────────────
+    {
+      sql: `CREATE TABLE IF NOT EXISTS teams (
+        id TEXT PRIMARY KEY,
+        owner_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        plan_id TEXT NOT NULL REFERENCES plans(id),
+        created_at TEXT DEFAULT (datetime('now'))
+      )`,
+      description: "Create teams table",
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS team_members (
+        user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+        joined_at TEXT DEFAULT (datetime('now'))
+      )`,
+      description: "Create team_members table",
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS team_invitations (
+        id TEXT PRIMARY KEY,
+        team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        invited_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT DEFAULT (datetime('now')),
+        responded_at TEXT
+      )`,
+      description: "Create team_invitations table",
+    },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS team_property_state (
+        team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+        property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        state TEXT DEFAULT 'new',
+        comment TEXT,
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (team_id, property_id)
+      )`,
+      description: "Create team_property_state table",
+    },
     // ── Indexes ──────────────────────────────────────────────────────────────
     {
       sql: "CREATE INDEX IF NOT EXISTS idx_user_plan_sub_status ON user_plan_subscriptions(status, current_period_end)",
@@ -201,6 +243,18 @@ export async function runMigrations(): Promise<void> {
     {
       sql: "CREATE INDEX IF NOT EXISTS idx_properties_source_url ON properties(source_url)",
       description: "Index properties by source_url (bulk discontinue)",
+    },
+    {
+      sql: "CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id)",
+      description: "Index team_members by team",
+    },
+    {
+      sql: "CREATE INDEX IF NOT EXISTS idx_team_invitations_email ON team_invitations(email, status)",
+      description: "Index team_invitations by email",
+    },
+    {
+      sql: "CREATE INDEX IF NOT EXISTS idx_team_invitations_team ON team_invitations(team_id, status)",
+      description: "Index team_invitations by team",
     },
   ];
 

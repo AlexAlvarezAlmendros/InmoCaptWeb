@@ -187,7 +187,7 @@ function chunks<T>(items: T[], size: number = SQL_CHUNK): T[][] {
   return out;
 }
 
-/** Ids (of `ids`) with reveals, agent state or credit movements. */
+/** Ids (of `ids`) with reveals, agent/team state or credit movements. */
 async function propertiesWithInteractions(ids: string[]): Promise<Set<string>> {
   const found = new Set<string>();
   for (const part of chunks(ids)) {
@@ -196,9 +196,10 @@ async function propertiesWithInteractions(ids: string[]): Promise<Set<string>> {
       sql: `
         SELECT property_id AS id FROM user_property_reveals WHERE property_id IN (${marks})
         UNION SELECT property_id FROM property_agent_state WHERE property_id IN (${marks})
+        UNION SELECT property_id FROM team_property_state WHERE property_id IN (${marks})
         UNION SELECT related_property_id FROM credit_transactions WHERE related_property_id IN (${marks})
       `,
-      args: [...part, ...part, ...part],
+      args: [...part, ...part, ...part, ...part],
     });
     for (const row of result.rows) found.add(row.id as string);
   }
@@ -220,6 +221,7 @@ async function deleteDuplicates(ids: string[]): Promise<string[]> {
         WHERE id IN (${marks})
           AND id NOT IN (SELECT property_id FROM user_property_reveals)
           AND id NOT IN (SELECT property_id FROM property_agent_state)
+          AND id NOT IN (SELECT property_id FROM team_property_state)
           AND id NOT IN (SELECT related_property_id FROM credit_transactions
                          WHERE related_property_id IS NOT NULL)
         RETURNING id

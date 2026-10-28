@@ -287,6 +287,8 @@ export function PlansPage() {
   }
 
   const isTrial = userPlan?.planId === "trial";
+  const team = userPlan?.team ?? null;
+  const isTeamMember = !!team && !team.isOwner;
 
   return (
     <div>
@@ -441,7 +443,7 @@ export function PlansPage() {
       </div>
 
       {/* Pending list changes */}
-      {userPlan && userPlan.pendingListChanges.length > 0 && (
+      {userPlan && !isTeamMember && userPlan.pendingListChanges.length > 0 && (
         <Card className="mt-8">
           <CardContent>
             <h3 className="mb-3 font-semibold text-slate-900 dark:text-white">
@@ -533,6 +535,18 @@ export function PlansPage() {
                 </>
               )}
             </p>
+            {team && team.memberCount > 1 && (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                {team.isOwner
+                  ? "Todos los miembros de un equipo deben tener el mismo plan. Al cambiar el tuyo, el equipo se disolverá"
+                  : `Todos los miembros de un equipo deben tener el mismo plan. Al cambiar el tuyo, saldrás del equipo de ${team.ownerEmail}`}
+                {changePlanTarget.type === "upgrade"
+                  ? "."
+                  : " cuando se aplique el cambio."}{" "}
+                Cada persona conserva los contactos que desbloqueó y una copia
+                de las notas.
+              </p>
+            )}
             <div className="mt-6 flex gap-2">
               <Button
                 variant="ghost"

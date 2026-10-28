@@ -79,6 +79,24 @@ export const createListRequestSchema = z.object({
 export type CreateListRequestInput = z.infer<typeof createListRequestSchema>;
 
 // ============================================
+// Team Routes
+// ============================================
+
+export const teamInviteSchema = z.object({
+  email: z.string().trim().email("Email no válido").max(254),
+});
+
+export type TeamInviteInput = z.infer<typeof teamInviteSchema>;
+
+export const teamInvitationIdParamSchema = z.object({
+  invitationId: z.string().uuid("Invalid invitation ID"),
+});
+
+export const teamMemberParamSchema = z.object({
+  userId: z.string().min(1).max(255),
+});
+
+// ============================================
 // Admin Routes
 // ============================================
 

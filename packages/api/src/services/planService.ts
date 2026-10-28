@@ -1,4 +1,5 @@
 import { db } from "../config/database.js";
+import { enforceTeamPlan, getListOwnerId } from "./teamService.js";
 
 export interface Plan {
   id: string;
@@ -211,6 +212,8 @@ export async function upsertPaidPlanSubscription(params: {
       params.firstMonthFree ? 1 : 0,
     ],
   });
+
+  await enforceTeamPlan(params.userId, params.planId);
 }
 
 /* ─── First month free (promo) ──────────────────────────────── */
@@ -336,7 +339,8 @@ export async function getUserListAccessIds(userId: string): Promise<string[]> {
 
 /**
  * Checks if the user can access a given list based on their active plan.
- * Unlimited (max_lists IS NULL) → true. Starter/Pro/Trial → check user_list_access.
+ * Unlimited (max_lists IS NULL) → true. Starter/Pro/Trial → check user_list_access
+ * (the team owner's rows when the user is in a team).
  */
 export async function canAccessList(
   userId: string,
@@ -347,9 +351,10 @@ export async function canAccessList(
 
   if (userPlan.plan.max_lists === null) return true;
 
+  const listOwnerId = await getListOwnerId(userId);
   const result = await db.execute({
     sql: "SELECT 1 FROM user_list_access WHERE user_id = ? AND list_id = ? LIMIT 1",
-    args: [userId, listId],
+    args: [listOwnerId, listId],
   });
   return result.rows.length > 0;
 }

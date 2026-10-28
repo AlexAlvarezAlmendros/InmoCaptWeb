@@ -7,6 +7,7 @@ import {
   TRIAL_PLAN_ID,
 } from "./planService.js";
 import { resetPlanCredits } from "./creditService.js";
+import { leaveTeam } from "./teamService.js";
 
 export interface DbUser {
   id: string;
@@ -282,6 +283,9 @@ export async function getStripeCustomerId(
  * stale credits, reveals or subscriptions.
  */
 export async function deleteUser(userId: string): Promise<void> {
+  // Teammates keep a copy of the shared notes; an owner's team is dissolved
+  await leaveTeam(userId);
+
   await db.batch([
     {
       sql: "DELETE FROM property_agent_state WHERE user_id = ?",

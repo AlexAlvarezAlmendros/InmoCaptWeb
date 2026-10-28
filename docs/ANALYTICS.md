@@ -134,6 +134,17 @@ uno nuevo obliga a declararlo primero, lo que evita que se cuelen variantes.
 | `list_no_credits_modal` | `list`, `source` |
 | `list_no_credits_buy_click` | `list`, `source`, `credits` |
 
+### Equipo
+
+| Evento | Datos |
+| --- | --- |
+| `team_invite_send` | `plan`, `members` |
+| `team_invite_error` | `reason` |
+| `team_invite_cancel` | — |
+| `team_invite_accept` / `team_invite_decline` | `plan` |
+| `team_member_remove` | `members` |
+| `team_leave` | `role` (`owner` disuelve el equipo, `member`) |
+
 ### Suscripciones por lista y cuenta
 
 | Evento | Datos |

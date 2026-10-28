@@ -19,6 +19,7 @@ import {
   setPlanPeriodEnd,
 } from "../services/planService.js";
 import { getBalance } from "../services/creditService.js";
+import { getListOwnerId, getTeamView } from "../services/teamService.js";
 import { stripe } from "../config/stripe.js";
 import { env } from "../config/env.js";
 import { zodValidate, updatePreferencesSchema } from "../schemas/validation.js";
@@ -105,7 +106,8 @@ export async function meRoutes(fastify: FastifyInstance) {
     { preHandler: [authenticate] },
     async (request, _reply) => {
       await ensureUserExists(request.user);
-      const lists = await getUserAccessedListsWithStats(request.user.sub);
+      const listOwnerId = await getListOwnerId(request.user.sub);
+      const lists = await getUserAccessedListsWithStats(listOwnerId);
       return { data: lists };
     },
   );
@@ -168,10 +170,13 @@ export async function meRoutes(fastify: FastifyInstance) {
         }
       }
 
+      // In a team, lists and scheduled list changes are the owner's
+      const team = await getTeamView(userId);
+      const listOwnerId = team?.ownerId ?? userId;
       const [balance, lists, pending] = await Promise.all([
         getBalance(userId),
-        getUserListAccessIds(userId),
-        getPendingListChanges(userId),
+        getUserListAccessIds(listOwnerId),
+        getPendingListChanges(listOwnerId),
       ]);
 
       return {
@@ -196,6 +201,15 @@ export async function meRoutes(fastify: FastifyInstance) {
             applyAt: p.apply_at,
             createdAt: p.created_at,
           })),
+          team: team
+            ? {
+                id: team.id,
+                planId: team.planId,
+                isOwner: team.isOwner,
+                ownerEmail: team.ownerEmail,
+                memberCount: team.members.length,
+              }
+            : null,
         },
       };
     },

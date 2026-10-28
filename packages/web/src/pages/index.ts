@@ -3,3 +3,4 @@ export { DashboardPage } from "./Dashboard";
 export { ListDetailPage } from "./ListDetail";
 export { SubscriptionsPage } from "./Subscriptions";
 export { AccountPage } from "./Account";
+export { TeamPage } from "./Team";

@@ -296,6 +296,67 @@ export async function sendFirstChargeReminderEmail(params: {
   });
 }
 
+/**
+ * Team invitation email (the invitee may not have an account yet)
+ */
+export async function sendTeamInvitationEmail(
+  to: string,
+  ownerEmail: string,
+  planName: string,
+): Promise<boolean> {
+  const teamUrl = `${env.FRONTEND_URL}/app/team`;
+  const safeOwner = escapeHtml(ownerEmail);
+  const safePlan = escapeHtml(planName);
+
+  return sendEmail({
+    to,
+    subject: `${ownerEmail} te invita a su equipo en InmoCapt`,
+    html: emailLayout(`
+      <h1 style="color: #1E3A5F; font-size: 24px; margin: 0 0 16px;">
+        Te han invitado a un equipo
+      </h1>
+      <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 16px;">
+        <strong>${safeOwner}</strong> quiere que formes parte de su equipo en InmoCapt.
+        Compartiréis las listas, los contactos desbloqueados y las notas de cada inmueble.
+        Cada uno mantiene sus propios créditos.
+      </p>
+      <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+        Para unirte necesitas tener el plan <strong>${safePlan}</strong> activo.
+      </p>
+      ${primaryButton("Ver invitación", teamUrl)}
+    `),
+    text: `${ownerEmail} te invita a su equipo en InmoCapt. Para unirte necesitas el plan ${planName}. Ver invitación: ${teamUrl}`,
+  });
+}
+
+/**
+ * Sent to a member who is no longer in a team because of someone else's
+ * action (removed by the owner, or the team was dissolved).
+ */
+export async function sendRemovedFromTeamEmail(
+  to: string,
+  ownerEmail: string,
+): Promise<boolean> {
+  const safeOwner = escapeHtml(ownerEmail);
+
+  return sendEmail({
+    to,
+    subject: "Ya no formas parte de un equipo en InmoCapt",
+    html: emailLayout(`
+      <h1 style="color: #1E3A5F; font-size: 24px; margin: 0 0 16px;">
+        Has salido del equipo
+      </h1>
+      <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+        Ya no formas parte del equipo de <strong>${safeOwner}</strong>.
+        Conservas los contactos que desbloqueaste con tus créditos y una copia del estado y las notas de los inmuebles.
+        A partir de ahora vuelves a trabajar con tus propias listas.
+      </p>
+      ${primaryButton("Ir a mis listas", `${env.FRONTEND_URL}/app/dashboard`)}
+    `),
+    text: `Ya no formas parte del equipo de ${ownerEmail}. Conservas tus contactos desbloqueados y una copia de las notas. ${env.FRONTEND_URL}/app/dashboard`,
+  });
+}
+
 // ─── Admin Notifications ──────────────────────────────────────────
 
 /**

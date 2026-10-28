@@ -1,4 +1,5 @@
 import { db } from "../config/database.js";
+import { getRevealSharingUserIds } from "./teamService.js";
 
 export type CreditTxType =
   | "grant_plan"
@@ -251,7 +252,7 @@ export async function grantTopupCredits(params: {
 
 /**
  * Spend 1 credit to reveal a property's contact. Priority: plan → topup.
- * Idempotent: if user_property_reveals already has this (user, property), no spend.
+ * Idempotent: if the user (or a teammate) already revealed this property, no spend.
  * Throws NoCreditsError if both buckets are at 0.
  *
  * Returns { alreadyRevealed, bucket, balance }
@@ -267,9 +268,14 @@ export async function spendCreditForReveal(params: {
 }> {
   const { userId, propertyId } = params;
 
+  const sharingUserIds = await getRevealSharingUserIds(userId);
   const existing = await db.execute({
-    sql: "SELECT 1 FROM user_property_reveals WHERE user_id = ? AND property_id = ? LIMIT 1",
-    args: [userId, propertyId],
+    sql: `
+      SELECT 1 FROM user_property_reveals
+      WHERE user_id IN (${sharingUserIds.map(() => "?").join(",")}) AND property_id = ?
+      LIMIT 1
+    `,
+    args: [...sharingUserIds, propertyId],
   });
   if (existing.rows.length > 0) {
     const balance = await getBalance(userId);
@@ -436,20 +442,22 @@ export async function getTransactionHistory(
 }
 
 /**
- * Return the set of property IDs the user has already revealed (cheap lookup).
+ * Return the set of property IDs the user (or a teammate) has already revealed.
  */
 export async function getRevealedPropertyIds(
   userId: string,
   propertyIds: string[],
 ): Promise<Set<string>> {
   if (propertyIds.length === 0) return new Set();
+  const sharingUserIds = await getRevealSharingUserIds(userId);
+  const userPlaceholders = sharingUserIds.map(() => "?").join(",");
   const placeholders = propertyIds.map(() => "?").join(",");
   const result = await db.execute({
     sql: `
-      SELECT property_id FROM user_property_reveals
-      WHERE user_id = ? AND property_id IN (${placeholders})
+      SELECT DISTINCT property_id FROM user_property_reveals
+      WHERE user_id IN (${userPlaceholders}) AND property_id IN (${placeholders})
     `,
-    args: [userId, ...propertyIds],
+    args: [...sharingUserIds, ...propertyIds],
   });
   return new Set(
     result.rows.map(

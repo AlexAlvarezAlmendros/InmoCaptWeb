@@ -94,6 +94,9 @@ export function AppLayout() {
               <NavLink to="/app/credits" className={navLinkClass}>
                 Créditos
               </NavLink>
+              <NavLink to="/app/team" className={navLinkClass}>
+                Equipo
+              </NavLink>
               <NavLink to="/app/account" className={navLinkClass}>
                 Cuenta
               </NavLink>
@@ -183,6 +186,13 @@ export function AppLayout() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Créditos
+              </NavLink>
+              <NavLink
+                to="/app/team"
+                className={mobileNavLinkClass}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Equipo
               </NavLink>
               <NavLink
                 to="/app/account"

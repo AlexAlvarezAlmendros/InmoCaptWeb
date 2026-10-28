@@ -7,6 +7,7 @@ import { SubscriptionsPage } from "@/pages/Subscriptions";
 import { PlansPage } from "@/pages/Plans";
 import { CreditsPage } from "@/pages/Credits";
 import { AccountPage } from "@/pages/Account";
+import { TeamPage } from "@/pages/Team";
 import { AdminListsPage } from "@/pages/admin/Lists";
 import { AdminRequestsPage } from "@/pages/admin/Requests";
 import { AdminUsersPage } from "@/pages/admin/Users";
@@ -50,6 +51,7 @@ export function AppRouter() {
         <Route path="subscriptions" element={<SubscriptionsPage />} />
         <Route path="plans" element={<PlansPage />} />
         <Route path="credits" element={<CreditsPage />} />
+        <Route path="team" element={<TeamPage />} />
         <Route path="account" element={<AccountPage />} />
       </Route>
 

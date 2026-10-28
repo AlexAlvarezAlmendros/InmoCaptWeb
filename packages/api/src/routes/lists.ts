@@ -33,6 +33,10 @@ import {
   getBalance,
 } from "../services/creditService.js";
 import { revealPropertyContact } from "../services/revealService.js";
+import { canManageLists, getListOwnerId } from "../services/teamService.js";
+
+const TEAM_LISTS_FORBIDDEN =
+  "Las listas del equipo solo las puede cambiar quien lo creó";
 
 export async function listsRoutes(fastify: FastifyInstance) {
   // Get available lists for user to subscribe to
@@ -61,14 +65,14 @@ export async function listsRoutes(fastify: FastifyInstance) {
     },
   );
 
-  // v2 catalog: all lists NOT in the user's user_list_access
+  // v2 catalog: all lists NOT in the user's (or their team's) user_list_access
   fastify.get(
     "/catalog",
     { preHandler: [authenticate] },
     async (request, _reply) => {
       const userId = request.user.sub;
       await ensureUserExists(request.user);
-      const lists = await getCatalogListsForUser(userId);
+      const lists = await getCatalogListsForUser(await getListOwnerId(userId));
       return {
         data: lists.map((list) => ({
           id: list.id,
@@ -197,6 +201,10 @@ export async function listsRoutes(fastify: FastifyInstance) {
 
       await ensureUserExists(request.user);
 
+      if (!(await canManageLists(userId))) {
+        return reply.code(403).send({ error: TEAM_LISTS_FORBIDDEN });
+      }
+
       const list = await getListById(listId);
       if (!list) return reply.code(404).send({ error: "List not found" });
 
@@ -244,6 +252,10 @@ export async function listsRoutes(fastify: FastifyInstance) {
 
       const userId = request.user.sub;
       await ensureUserExists(request.user);
+
+      if (!(await canManageLists(userId))) {
+        return reply.code(403).send({ error: TEAM_LISTS_FORBIDDEN });
+      }
 
       const userPlan = await getUserPlanWithDefinition(userId);
       if (!userPlan || !userPlan.isActive) {
